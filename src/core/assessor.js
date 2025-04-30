@@ -27,7 +27,7 @@ const __dirname = dirname(__filename);
  * @returns {Promise<Object>} Assessment results including drift and security data
  * @throws {Error} If the package.json file cannot be found or parsed
  */
-export async function assessDependencies (packageJsonPath, options = {}) {
+async function assessDependencies (packageJsonPath, options = {}) {
   const {
     includeDevDependencies = true,
     includePeerDependencies = true,
