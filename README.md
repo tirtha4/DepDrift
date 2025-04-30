@@ -60,6 +60,11 @@ npm install -g depdrift
 npm install --save-dev depdrift
 ```
 
+### Requirements
+
+- **Node.js**: v12.20.0 or higher (v14+ recommended for optimal performance)
+- **npm**: v6.0.0 or higher
+
 ## Usage
 
 ### Basic usage
@@ -238,6 +243,27 @@ export SNYK_API_KEY=your-snyk-api-key
 
 # For GitHub integration
 export GITHUB_TOKEN=your-github-personal-access-token
+```
+
+## Implementation Details
+
+### ES Modules Support
+
+DepDrift is implemented using ES Modules, which means:
+
+- It supports modern JavaScript features
+- It's compatible with Node.js versions that support ES Modules (Node.js 12+)
+- It can be imported using `import` statements in your code
+
+If you want to use DepDrift programmatically in your code:
+
+```javascript
+// ES Modules (recommended)
+import { assessDependencies } from 'depdrift';
+
+// CommonJS (using dynamic import)
+const depdrift = await import('depdrift');
+const { assessDependencies } = depdrift;
 ```
 
 ## Drift Levels
