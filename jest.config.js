@@ -1,7 +1,7 @@
 /**
  * Jest configuration file for DepDrift
  */
-module.exports = {
+export default {
   // The root directory containing tests
   roots: ['<rootDir>/test/'],
   
@@ -52,5 +52,9 @@ module.exports = {
   clearMocks: true,
   
   // The directory to store coverage reports
-  coverageDirectory: 'coverage'
+  coverageDirectory: 'coverage',
+  
+  // Configure to work with ES Modules
+  transform: {},
+  extensionsToTreatAsEsm: ['.js']
 }; 

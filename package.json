@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node bin/depdrift",
-    "test": "jest --coverage",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
     "self-analyze": "node bin/depdrift",
     "lint": "eslint src",
     "prepublishOnly": "npm test"
