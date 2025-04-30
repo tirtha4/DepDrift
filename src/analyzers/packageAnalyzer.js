@@ -12,22 +12,25 @@ const semver = require('semver');
 const axios = require('axios');
 const { initCache } = require('../core/cache');
 const { summarizeDriftLevels } = require('../utils/driftUtils');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const { getCache, setCache } = require('../core/cache.js');
 
 /**
  * Calculate days between two dates
  * @param {Date|string} date1 - First date
- * @param {Date|string} date2 - Second date 
+ * @param {Date|string} date2 - Second date
  * @returns {number} Number of days between dates
  * @private
  */
-function daysBetween(date1, date2) {
+function daysBetween (date1, date2) {
   const d1 = date1 instanceof Date ? date1 : new Date(date1);
   const d2 = date2 instanceof Date ? date2 : new Date(date2);
-  
+
   // Convert to UTC to avoid timezone issues
   const utc1 = Date.UTC(d1.getFullYear(), d1.getMonth(), d1.getDate());
   const utc2 = Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate());
-  
+
   // Calculate days (86400000 ms in a day)
   return Math.floor((utc2 - utc1) / 86400000);
 }
@@ -40,26 +43,26 @@ function daysBetween(date1, date2) {
  * @returns {string} Drift level ('none', 'low', 'medium', 'high', 'critical')
  * @private
  */
-function determineDriftLevel(daysBehind, currentVersion, latestVersion) {
+function determineDriftLevel (daysBehind, currentVersion, latestVersion) {
   if (daysBehind === 0 || currentVersion === latestVersion) {
     return 'none';
   }
-  
+
   // Parse versions
   const current = semver.parse(currentVersion);
   const latest = semver.parse(latestVersion);
-  
+
   if (!current || !latest) {
     // If can't parse versions, use days as fallback
     return determineDriftLevelByDays(daysBehind);
   }
-  
+
   // Prioritize semantic versioning differences over time-based drift
   // This ensures a patch update won't be marked as critical just because it's old
   // - Major version differences are high/critical based on compatibility risk
   // - Minor version differences are medium/high based on feature gap
   // - Patch versions are capped at medium severity regardless of time
-  
+
   // Major version difference - highest priority
   if (latest.major > current.major) {
     // Multiple major versions behind is critical
@@ -69,7 +72,7 @@ function determineDriftLevel(daysBehind, currentVersion, latestVersion) {
     // One major version behind is high, regardless of time
     return 'high';
   }
-  
+
   // Minor version difference (same major)
   if (latest.minor > current.minor) {
     // Many minor versions behind is high
@@ -79,7 +82,7 @@ function determineDriftLevel(daysBehind, currentVersion, latestVersion) {
     // Fewer minor versions are medium, regardless of time
     return 'medium';
   }
-  
+
   // Patch version difference (same major and minor)
   // For patch updates, we'll cap the severity to prevent marking them critical
   if (latest.patch > current.patch) {
@@ -87,25 +90,25 @@ function determineDriftLevel(daysBehind, currentVersion, latestVersion) {
     if (latest.patch - current.patch >= 10) {
       return 'medium';
     }
-    
+
     // For patch updates, consider time but cap at medium
     if (daysBehind > 180) {
       return 'medium';
     } else if (daysBehind > 90) {
       return 'low';
     }
-    
+
     return 'low';
   }
-  
+
   // If we get here, it's likely a prerelease version comparison that's tricky to parse
   // Apply time-based calculation but cap at medium for non-major/minor changes
   const timeBased = determineDriftLevelByDays(daysBehind);
-  
+
   if (timeBased === 'critical' || timeBased === 'high') {
     return 'medium';
   }
-  
+
   return timeBased;
 }
 
@@ -115,7 +118,7 @@ function determineDriftLevel(daysBehind, currentVersion, latestVersion) {
  * @returns {string} Drift level ('none', 'low', 'medium', 'high', 'critical')
  * @private
  */
-function determineDriftLevelByDays(days) {
+function determineDriftLevelByDays (days) {
   if (days === 0) {
     return 'none';
   }
@@ -147,10 +150,10 @@ function determineDriftLevelByDays(days) {
  * @property {boolean} isDevDependency - Whether this is a dev dependency
  * @public
  */
-async function analyzeDependency(name, currentVersion, dev = false) {
+async function analyzeDependency (name, currentVersion, dev = false) {
   const registry = getNpmRegistry();
   let packageInfo;
-  
+
   try {
     packageInfo = await registry.getPackageInfo(name);
   } catch (error) {
@@ -165,7 +168,7 @@ async function analyzeDependency(name, currentVersion, dev = false) {
       isDevDependency: dev
     };
   }
-  
+
   // Get latest version
   const latestVersion = packageInfo['dist-tags']?.latest;
   if (!latestVersion) {
@@ -180,18 +183,18 @@ async function analyzeDependency(name, currentVersion, dev = false) {
       isDevDependency: dev
     };
   }
-  
+
   // If currentVersion has range indicators (^~), clean it
   const cleanCurrentVersion = semver.clean(currentVersion) || currentVersion.replace(/[^\d.]/g, '');
-  
+
   // Last updated date from the latest version
   const lastUpdated = packageInfo.time?.[latestVersion];
   const now = new Date();
   const daysBehind = lastUpdated ? daysBetween(lastUpdated, now) : -1;
-  
+
   // Determine drift level
   const driftLevel = determineDriftLevel(daysBehind, cleanCurrentVersion, latestVersion);
-  
+
   return {
     name,
     currentVersion: cleanCurrentVersion,
@@ -218,30 +221,30 @@ async function analyzeDependency(name, currentVersion, dev = false) {
  * @property {Object} summary - Summary statistics of drift levels
  * @public
  */
-async function analyzePackage(packageInfo, options = {}) {
-  const { 
-    groupByLevel = false, 
+async function analyzePackage (packageInfo, options = {}) {
+  const {
+    groupByLevel = false,
     excludeProd = false,
     excludeDev = false,
     excludePeer = false,
     excludeOptional = false,
     maxConcurrent = 10
   } = options;
-  
+
   // Extract dependencies
   const prodDeps = excludeProd ? {} : (packageInfo.dependencies || {});
   const devDeps = excludeDev ? {} : (packageInfo.devDependencies || {});
   const peerDeps = excludePeer ? {} : (packageInfo.peerDependencies || {});
   const optionalDeps = excludeOptional ? {} : (packageInfo.optionalDependencies || {});
-  
+
   // Combine dependencies
   const dependencies = [];
-  
+
   // Process production dependencies
   for (const [name, version] of Object.entries(prodDeps)) {
     // Skip if it's also in optionalDependencies
     if (name in optionalDeps) continue;
-    
+
     dependencies.push({
       name,
       currentVersion: version.replace(/^[\^~]/, ''),
@@ -251,7 +254,7 @@ async function analyzePackage(packageInfo, options = {}) {
       type: 'regular'
     });
   }
-  
+
   // Process optional dependencies
   for (const [name, version] of Object.entries(optionalDeps)) {
     dependencies.push({
@@ -263,7 +266,7 @@ async function analyzePackage(packageInfo, options = {}) {
       type: 'optional'
     });
   }
-  
+
   // Process dev dependencies
   for (const [name, version] of Object.entries(devDeps)) {
     dependencies.push({
@@ -275,7 +278,7 @@ async function analyzePackage(packageInfo, options = {}) {
       type: 'dev'
     });
   }
-  
+
   // Process peer dependencies
   for (const [name, version] of Object.entries(peerDeps)) {
     dependencies.push({
@@ -287,23 +290,23 @@ async function analyzePackage(packageInfo, options = {}) {
       type: 'peer'
     });
   }
-  
+
   // Process in batches to avoid hammering the npm registry
   const batchSize = maxConcurrent;
   const batches = [];
-  
+
   for (let i = 0; i < dependencies.length; i += batchSize) {
     batches.push(dependencies.slice(i, i + batchSize));
   }
-  
+
   const results = [];
-  
+
   // Process batches sequentially
   for (const batch of batches) {
     const batchResults = await Promise.all(batch.map(async (dep) => {
       try {
         const npmInfo = await fetchNpmPackageInfo(dep.name);
-        
+
         if (!npmInfo) {
           return {
             ...dep,
@@ -312,9 +315,9 @@ async function analyzePackage(packageInfo, options = {}) {
             daysBehind: -1
           };
         }
-        
+
         const latestVersion = npmInfo['dist-tags']?.latest;
-        
+
         if (!latestVersion) {
           return {
             ...dep,
@@ -323,23 +326,23 @@ async function analyzePackage(packageInfo, options = {}) {
             daysBehind: -1
           };
         }
-        
+
         // Clean version (remove range indicators)
-        const cleanCurrentVersion = semver.clean(dep.currentVersion) || 
+        const cleanCurrentVersion = semver.clean(dep.currentVersion) ||
           dep.currentVersion.replace(/[^\d.]/g, '');
-        
+
         // Get publication date of latest version
         const lastUpdated = npmInfo.time?.[latestVersion];
         const now = new Date();
         const daysBehind = lastUpdated ? daysBetween(lastUpdated, now) : -1;
-        
+
         // Calculate drift level
         const driftLevel = calculateDriftLevel(
-          cleanCurrentVersion, 
-          latestVersion, 
+          cleanCurrentVersion,
+          latestVersion,
           daysBehind
         );
-        
+
         return {
           ...dep,
           currentVersion: cleanCurrentVersion,
@@ -357,13 +360,13 @@ async function analyzePackage(packageInfo, options = {}) {
         };
       }
     }));
-    
+
     results.push(...batchResults);
   }
-  
+
   // Generate summary statistics
   const summary = summarizeDriftLevels(results);
-  
+
   // Create the result object
   const result = {
     dependencies: results,
@@ -372,7 +375,7 @@ async function analyzePackage(packageInfo, options = {}) {
     projectName: packageInfo.name || 'Unknown Project',
     projectVersion: packageInfo.version || '0.0.0'
   };
-  
+
   // Group by level if requested
   if (groupByLevel) {
     result.byLevel = {
@@ -386,7 +389,7 @@ async function analyzePackage(packageInfo, options = {}) {
       'optional-missing': results.filter(d => d.driftLevel === 'optional-missing')
     };
   }
-  
+
   return result;
 }
 
@@ -398,23 +401,23 @@ async function analyzePackage(packageInfo, options = {}) {
  * @returns {string} Drift level ('none', 'low', 'medium', 'high', 'critical')
  * @public
  */
-function calculateDriftLevel(currentVersion, latestVersion, daysBehind) {
+function calculateDriftLevel (currentVersion, latestVersion, daysBehind) {
   // If versions are the same, no drift
   if (currentVersion === latestVersion) {
     return 'none';
   }
-  
+
   // Parse versions with semver
   const current = semver.parse(currentVersion);
   const latest = semver.parse(latestVersion);
-  
+
   if (!current || !latest) {
     // If can't parse versions, use days as fallback
     return calculateDriftLevelByDays(daysBehind);
   }
-  
+
   let driftLevel = 'low';
-  
+
   // Major version difference
   if (latest.major > current.major) {
     const majorDiff = latest.major - current.major;
@@ -430,10 +433,10 @@ function calculateDriftLevel(currentVersion, latestVersion, daysBehind) {
     const patchDiff = latest.patch - current.patch;
     driftLevel = patchDiff >= 10 ? 'medium' : 'low';
   }
-  
+
   // Also consider days behind
   const driftByDays = calculateDriftLevelByDays(daysBehind);
-  
+
   // Return the more severe of the two levels
   const severityOrder = {
     'none': 0,
@@ -442,9 +445,9 @@ function calculateDriftLevel(currentVersion, latestVersion, daysBehind) {
     'high': 3,
     'critical': 4
   };
-  
-  return severityOrder[driftByDays] > severityOrder[driftLevel] 
-    ? driftByDays 
+
+  return severityOrder[driftByDays] > severityOrder[driftLevel]
+    ? driftByDays
     : driftLevel;
 }
 
@@ -454,7 +457,7 @@ function calculateDriftLevel(currentVersion, latestVersion, daysBehind) {
  * @returns {string} Drift level ('none', 'low', 'medium', 'high', 'critical')
  * @public
  */
-function calculateDriftLevelByDays(days) {
+function calculateDriftLevelByDays (days) {
   if (days <= 0) {
     return 'none';
   }
@@ -478,7 +481,7 @@ function calculateDriftLevelByDays(days) {
  * @returns {Promise<Object|null>} Package information object or null if not found/error
  * @public
  */
-async function fetchNpmPackageInfo(packageName, options = {}) {
+async function fetchNpmPackageInfo (packageName, options = {}) {
   const registry = getNpmRegistry();
   try {
     return await registry.getPackageInfo(packageName);
@@ -498,23 +501,23 @@ async function fetchNpmPackageInfo(packageName, options = {}) {
  * // Returns "1.2.3" given "^1.2.0" and ["1.0.0", "1.1.0", "1.2.3"]
  * parseVersionRange('^1.2.0', ['1.0.0', '1.1.0', '1.2.3']);
  */
-function parseVersionRange(versionRange, availableVersions = []) {
+function parseVersionRange (versionRange, availableVersions = []) {
   // If it's already a specific version, return it
   if (semver.valid(versionRange)) {
     return versionRange;
   }
-  
+
   // If it has a range indicator, find the highest matching version
   if (availableVersions.length > 0) {
     try {
       // Filter out prerelease versions unless the range explicitly includes them
-      const filteredVersions = versionRange.includes('-') 
-        ? availableVersions 
+      const filteredVersions = versionRange.includes('-')
+        ? availableVersions
         : availableVersions.filter(v => !isPreRelease(v));
-      
+
       // Find the highest version that satisfies the range
       const highestMatching = semver.maxSatisfying(filteredVersions, versionRange);
-      
+
       if (highestMatching) {
         return highestMatching;
       }
@@ -522,7 +525,7 @@ function parseVersionRange(versionRange, availableVersions = []) {
       // If semver parsing fails, continue to fallback
     }
   }
-  
+
   // Fallback: strip range indicators and return
   return versionRange.replace(/^[\^~]/, '');
 }
@@ -533,12 +536,12 @@ function parseVersionRange(versionRange, availableVersions = []) {
  * @returns {boolean} True if it's a prerelease version, false otherwise
  * @public
  */
-function isPreRelease(version) {
+function isPreRelease (version) {
   if (!version) return false;
-  
+
   const parsed = semver.parse(version);
   if (!parsed) return false;
-  
+
   return parsed.prerelease.length > 0;
 }
 
@@ -551,22 +554,31 @@ function isPreRelease(version) {
  * @example
  * // Returns true
  * satisfiesRange('1.2.3', '^1.0.0');
- * 
+ *
  * // Returns false
  * satisfiesRange('1.2.3', '^2.0.0');
  */
-function satisfiesRange(installedVersion, versionRange) {
+function satisfiesRange (installedVersion, versionRange) {
   try {
     // Handle exact versions
     if (versionRange === installedVersion) {
       return true;
     }
-    
+
     // Use semver to check if the installed version satisfies the range
     return semver.satisfies(installedVersion, versionRange);
   } catch (error) {
     // In case of parsing errors, fall back to string comparison
     return versionRange.includes(installedVersion);
+  }
+}
+
+async function getPackageVersions(packageName) {
+  try {
+    // ... existing code ...
+  } catch (err) {
+    console.warn(`Error fetching versions for ${packageName}:`, err);
+    return [];
   }
 }
 
@@ -582,5 +594,6 @@ module.exports = {
   fetchNpmPackageInfo,
   parseVersionRange,
   isPreRelease,
-  satisfiesRange
-}; 
+  satisfiesRange,
+  getPackageVersions
+};

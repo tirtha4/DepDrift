@@ -6,13 +6,15 @@
  * and OSSI database.
  */
 
-const axios = require('axios');
-const semver = require('semver');
-const { satisfiesRange } = require('../utils/driftUtils');
-const { exec } = require('child_process');
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import axios from 'axios';
+import { getCache, setCache } from '../core/cache.js';
+import semver from 'semver';
+import { satisfiesRange } from '../utils/driftUtils';
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
 
 /**
  * Available vulnerability data sources
@@ -47,13 +49,13 @@ const VULNERABILITY_SOURCES = {
  * @property {string} [error] - Error message if vulnerability check failed
  * @public
  */
-async function checkVulnerabilities(packageName, version, options = {}) {
-  const { 
-    sources = ['NPM_AUDIT'], 
+async function checkVulnerabilities (packageName, version, options = {}) {
+  const {
+    sources = ['NPM_AUDIT'],
     useCache = true,
     packageJsonPath
   } = options;
-  
+
   // Results object
   const results = {
     packageName,
@@ -63,27 +65,27 @@ async function checkVulnerabilities(packageName, version, options = {}) {
     highestSeverity: 'none',
     sources: []
   };
-  
+
   try {
     // Check each requested source
     const sourcePromises = sources.map(source => {
       switch(source) {
-        case 'NPM_AUDIT':
-          return checkNpmAudit(packageName, version, packageJsonPath, useCache);
-        case 'SNYK':
-          return checkSnykDatabase(packageName, version, useCache);
-        case 'GITHUB':
-          return checkGithubAdvisories(packageName, version, useCache);
-        case 'OSSI':
-          return checkOssiDatabase(packageName, version, useCache);
-        default:
-          return Promise.resolve({ source, vulnerabilities: [] });
+      case 'NPM_AUDIT':
+        return checkNpmAudit(packageName, version, packageJsonPath, useCache);
+      case 'SNYK':
+        return checkSnykDatabase(packageName, version, useCache);
+      case 'GITHUB':
+        return checkGithubAdvisories(packageName, version, useCache);
+      case 'OSSI':
+        return checkOssiDatabase(packageName, version, useCache);
+      default:
+        return Promise.resolve({ source, vulnerabilities: [] });
       }
     });
-    
+
     // Wait for all checks to complete
     const sourceResults = await Promise.all(sourcePromises);
-    
+
     // Combine results
     sourceResults.forEach(sourceResult => {
       if (sourceResult.vulnerabilities && sourceResult.vulnerabilities.length > 0) {
@@ -91,13 +93,13 @@ async function checkVulnerabilities(packageName, version, options = {}) {
         results.vulnerabilities.push(...sourceResult.vulnerabilities);
       }
     });
-    
+
     // Update overall vulnerability status
     results.vulnerable = results.vulnerabilities.length > 0;
-    
+
     // Determine highest severity
     results.highestSeverity = getHighestSeverity(results.vulnerabilities);
-    
+
     return results;
   } catch (error) {
     console.error(`Error checking vulnerabilities for ${packageName}@${version}:`, error.message);
@@ -117,11 +119,11 @@ async function checkVulnerabilities(packageName, version, options = {}) {
  * @param {boolean} useCache - Whether to use cached results
  * @returns {Promise<Object>} Vulnerability information from npm
  */
-async function checkNpmAudit(packageName, version, packageJsonPath, useCache = true) {
+async function checkNpmAudit (packageName, version, packageJsonPath, useCache = true) {
   try {
     // Determine the directory containing the package.json
     const packageDir = packageJsonPath ? path.dirname(packageJsonPath) : process.cwd();
-    
+
     // Run npm audit on the specified package directory
     const auditResults = await new Promise((resolve, reject) => {
       exec('npm audit --json', { cwd: packageDir }, (error, stdout, stderr) => {
@@ -143,13 +145,13 @@ async function checkNpmAudit(packageName, version, packageJsonPath, useCache = t
         }
       });
     });
-    
+
     const vulnerabilities = [];
-    
+
     // Check if the specific package has vulnerabilities
     if (auditResults && auditResults.vulnerabilities && auditResults.vulnerabilities[packageName]) {
       const vulnInfo = auditResults.vulnerabilities[packageName];
-      
+
       // Process each vulnerability via entry
       if (Array.isArray(vulnInfo.via)) {
         vulnInfo.via.forEach(via => {
@@ -157,7 +159,7 @@ async function checkNpmAudit(packageName, version, packageJsonPath, useCache = t
           if (typeof via === 'object') {
             // Check if this vulnerability affects the version we're checking
             const vulnerableRange = via.range || '<999.999.999'; // Default to vulnerable if no range specified
-            
+
             if (satisfiesRange(version, vulnerableRange)) {
               vulnerabilities.push({
                 id: via.source || via.url || via.id || 'unknown',
@@ -174,13 +176,13 @@ async function checkNpmAudit(packageName, version, packageJsonPath, useCache = t
         });
       }
     }
-    
+
     return {
       source: 'NPM_AUDIT',
       vulnerabilities
     };
   } catch (error) {
-    console.error(`Error running npm audit for ${packageName}@${version}:`, error.message);
+    console.warn(`Error running npm audit for ${packageName}@${version}:`, error);
     return {
       source: 'NPM_AUDIT',
       vulnerabilities: []
@@ -196,10 +198,10 @@ async function checkNpmAudit(packageName, version, packageJsonPath, useCache = t
  * @param {boolean} useCache - Whether to use cached results
  * @returns {Promise<Object>} Vulnerability information from Snyk
  */
-async function checkSnykDatabase(packageName, version, useCache = true) {
+async function checkSnykDatabase (packageName, version, useCache = true) {
   // Snyk API requires authentication
   const apiKey = process.env.SNYK_API_KEY;
-  
+
   if (!apiKey) {
     return {
       source: 'SNYK',
@@ -207,15 +209,15 @@ async function checkSnykDatabase(packageName, version, useCache = true) {
       error: 'No Snyk API key provided. Set SNYK_API_KEY environment variable.'
     };
   }
-  
+
   try {
     const response = await axios.get(
       `https://snyk.io/api/v1/test/npm/${packageName}/${version}`,
       { headers: { Authorization: `token ${apiKey}` } }
     );
-    
+
     const vulnerabilities = [];
-    
+
     if (response.data && response.data.issues && response.data.issues.vulnerabilities) {
       response.data.issues.vulnerabilities.forEach(vuln => {
         vulnerabilities.push({
@@ -230,12 +232,13 @@ async function checkSnykDatabase(packageName, version, useCache = true) {
         });
       });
     }
-    
+
     return {
       source: 'SNYK',
       vulnerabilities
     };
   } catch (error) {
+    console.warn(`Error checking Snyk for ${packageName}@${version}:`, error);
     return {
       source: 'SNYK',
       vulnerabilities: [],
@@ -252,14 +255,14 @@ async function checkSnykDatabase(packageName, version, useCache = true) {
  * @param {boolean} useCache - Whether to use cached results
  * @returns {Promise<Object>} Vulnerability information from GitHub
  */
-async function checkGithubAdvisories(packageName, version, useCache = true) {
+async function checkGithubAdvisories (packageName, version, useCache = true) {
   try {
     // GitHub's GraphQL API for security advisories
     const response = await axios({
       url: 'https://api.github.com/graphql',
       method: 'post',
       headers: {
-        Authorization: `bearer ${process.env.GITHUB_TOKEN || ''}`,
+        Authorization: `bearer ${process.env.GITHUB_TOKEN || ''}`
       },
       data: {
         query: `
@@ -284,16 +287,16 @@ async function checkGithubAdvisories(packageName, version, useCache = true) {
         `
       }
     });
-    
+
     const vulnerabilities = [];
-    
-    if (response.data && 
-        response.data.data && 
-        response.data.data.securityVulnerabilities && 
+
+    if (response.data &&
+        response.data.data &&
+        response.data.data.securityVulnerabilities &&
         response.data.data.securityVulnerabilities.nodes) {
-      
+
       const vulns = response.data.data.securityVulnerabilities.nodes;
-      
+
       vulns.forEach(vuln => {
         // Check if this version is affected
         if (vuln.vulnerableVersionRange && satisfiesRange(version, vuln.vulnerableVersionRange)) {
@@ -301,9 +304,9 @@ async function checkGithubAdvisories(packageName, version, useCache = true) {
           if (vuln.advisory.withdrawnAt) {
             return;
           }
-          
+
           const patchedVersion = vuln.firstPatchedVersion?.identifier || 'none';
-          
+
           vulnerabilities.push({
             id: vuln.advisory.id,
             title: vuln.advisory.summary,
@@ -317,12 +320,13 @@ async function checkGithubAdvisories(packageName, version, useCache = true) {
         }
       });
     }
-    
+
     return {
       source: 'GITHUB',
       vulnerabilities
     };
   } catch (error) {
+    console.warn(`Error checking GitHub for ${packageName}@${version}:`, error);
     return {
       source: 'GITHUB',
       vulnerabilities: [],
@@ -339,15 +343,15 @@ async function checkGithubAdvisories(packageName, version, useCache = true) {
  * @param {boolean} useCache - Whether to use cached results
  * @returns {Promise<Object>} Vulnerability information from OSSI
  */
-async function checkOssiDatabase(packageName, version, useCache = true) {
+async function checkOssiDatabase (packageName, version, useCache = true) {
   try {
     // OSSI API provides vulnerability information
     const response = await axios.get(
       `https://ossi.devmendo.com/api/vulnerabilities/package?name=${packageName}&version=${version}`
     );
-    
+
     const vulnerabilities = [];
-    
+
     if (response.data && response.data.vulnerabilities) {
       response.data.vulnerabilities.forEach(vuln => {
         vulnerabilities.push({
@@ -362,7 +366,7 @@ async function checkOssiDatabase(packageName, version, useCache = true) {
         });
       });
     }
-    
+
     return {
       source: 'OSSI',
       vulnerabilities
@@ -383,39 +387,39 @@ async function checkOssiDatabase(packageName, version, useCache = true) {
  * @param {string} currentVersion - Current version of the package
  * @returns {string} Recommendation for addressing the vulnerability
  */
-function getRecommendation(vulnerability, currentVersion) {
+function getRecommendation (vulnerability, currentVersion) {
   if (!vulnerability) {
     return 'No specific recommendation available';
   }
-  
+
   // Default recommendation if we can't determine more specific advice
   let recommendation = 'Update to the latest version';
-  
+
   // If there's a fixed version, recommend updating to it
   if (vulnerability.patchedVersions && vulnerability.patchedVersions !== 'unknown') {
     const patchedVersions = vulnerability.patchedVersions.split(',').map(v => v.trim());
-    
+
     if (patchedVersions.length > 0) {
       // Get the minimal version that would fix the vulnerability
       let minFixVersion;
-      
+
       for (const version of patchedVersions) {
         if (!minFixVersion || semver.lt(semver.clean(version), semver.clean(minFixVersion))) {
           minFixVersion = version;
         }
       }
-      
+
       if (minFixVersion) {
         recommendation = `Update to ${minFixVersion} or later`;
       }
     }
   }
-  
+
   // If the vulnerability has a specific remediation
   if (vulnerability.remediation) {
     recommendation = vulnerability.remediation;
   }
-  
+
   return recommendation;
 }
 
@@ -425,18 +429,18 @@ function getRecommendation(vulnerability, currentVersion) {
  * @param {string} severity - GitHub severity (CRITICAL, HIGH, MODERATE, LOW)
  * @returns {string} Standardized severity (critical, high, medium, low)
  */
-function mapGitHubSeverity(severity) {
+function mapGitHubSeverity (severity) {
   switch(severity) {
-    case 'CRITICAL':
-      return 'critical';
-    case 'HIGH':
-      return 'high';
-    case 'MODERATE':
-      return 'medium';
-    case 'LOW':
-      return 'low';
-    default:
-      return 'medium';
+  case 'CRITICAL':
+    return 'critical';
+  case 'HIGH':
+    return 'high';
+  case 'MODERATE':
+    return 'medium';
+  case 'LOW':
+    return 'low';
+  default:
+    return 'medium';
   }
 }
 
@@ -447,11 +451,11 @@ function mapGitHubSeverity(severity) {
  * @returns {string} Highest severity level ('none', 'low', 'medium', 'high', 'critical')
  * @private
  */
-function getHighestSeverity(vulnerabilities) {
+function getHighestSeverity (vulnerabilities) {
   if (!vulnerabilities || vulnerabilities.length === 0) {
     return 'none';
   }
-  
+
   // Define severity levels in order
   const severityLevels = {
     critical: 4,
@@ -460,16 +464,16 @@ function getHighestSeverity(vulnerabilities) {
     low: 1,
     none: 0
   };
-  
+
   let highestLevel = 'none';
-  
+
   vulnerabilities.forEach(vuln => {
     const severity = vuln.severity || 'none';
     if (severityLevels[severity] > severityLevels[highestLevel]) {
       highestLevel = severity;
     }
   });
-  
+
   return highestLevel;
 }
 
@@ -492,23 +496,23 @@ function getHighestSeverity(vulnerabilities) {
  * @property {number} summary.percentVulnerable - Percentage of vulnerable dependencies
  * @public
  */
-async function analyzeSecurity(dependencies, options = {}) {
-  const { 
-    sources = ['NPM_AUDIT'], 
+async function analyzeSecurity (dependencies, options = {}) {
+  const {
+    sources = ['NPM_AUDIT'],
     useCache = true,
     maxConcurrent = 5,
     packageJsonPath
   } = options;
-  
+
   // Create a copy of dependencies to add security info
   const results = [];
-  
+
   // Process in batches to avoid rate limits
   const batches = [];
   for (let i = 0; i < dependencies.length; i += maxConcurrent) {
     batches.push(dependencies.slice(i, i + maxConcurrent));
   }
-  
+
   for (const batch of batches) {
     await Promise.all(batch.map(async (dep) => {
       try {
@@ -524,14 +528,14 @@ async function analyzeSecurity(dependencies, options = {}) {
           });
           return;
         }
-        
+
         // Check for vulnerabilities
         const securityInfo = await checkVulnerabilities(dep.name, dep.currentVersion, {
           sources,
           useCache,
           packageJsonPath
         });
-        
+
         results.push(securityInfo);
       } catch (error) {
         // Add error info
@@ -546,13 +550,13 @@ async function analyzeSecurity(dependencies, options = {}) {
       }
     }));
   }
-  
+
   // Calculate summary statistics
   const total = results.length;
   const vulnerable = results.filter(r => r.vulnerable).length;
   const clean = results.filter(r => !r.vulnerable && !r.error).length;
   const error = results.filter(r => r.error).length;
-  
+
   // Count by severity
   const severityCounts = {
     critical: results.filter(r => r.highestSeverity === 'critical').length,
@@ -561,7 +565,7 @@ async function analyzeSecurity(dependencies, options = {}) {
     low: results.filter(r => r.highestSeverity === 'low').length,
     none: results.filter(r => r.highestSeverity === 'none').length
   };
-  
+
   return {
     results,
     summary: {
@@ -575,8 +579,19 @@ async function analyzeSecurity(dependencies, options = {}) {
   };
 }
 
+function normalizeVulnerability(vuln, source, currentVersion) {
+  return {
+    source,
+    severity: vuln.severity || 'unknown',
+    title: vuln.title || 'Unknown vulnerability',
+    description: vuln.description || 'No description available',
+    recommendation: vuln.recommendation || 'No recommendation available',
+    references: vuln.references || []
+  };
+}
+
 module.exports = {
   analyzeSecurity,
   checkVulnerabilities,
   VULNERABILITY_SOURCES
-}; 
+};
