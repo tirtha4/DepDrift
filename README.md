@@ -1,7 +1,7 @@
 # DepDrift
 
-Most developers don't update dependencies until something breaks.
-That's when you lose days firefighting builds, bugs, or CVEs.
+> **Most developers don't update dependencies until something breaks.
+That's when you lose days firefighting builds, bugs, or CVEs.**
 
 **DepDrift tells you what's getting risky—before it hurts you.**
 
@@ -21,7 +21,8 @@ Dependency drift occurs when your project's dependencies fall behind the latest 
 
 DepDrift helps you analyze and understand the current state of your project's dependencies and how far they have drifted from the latest versions.
 
-![DepDrift Sample Output](https://sample-output.png)
+![DepDrift Sample Output](https://github.com/user-attachments/assets/0a0fbce6-5fc5-461d-a1a7-c5ba1119d7cd)
+
 
 ## Key Features
 
