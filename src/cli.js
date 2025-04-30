@@ -13,6 +13,11 @@ const fs = require('fs-extra');
 const path = require('path');
 const chalk = require('chalk');
 const Table = require('cli-table3');
+const { handleError, handleWarning } = require('./utils/errorHandler');
+const { generateTable } = require('./formatters/tableFormatter');
+const { generateHtmlReport } = require('./formatters/htmlFormatter');
+const { formatAnalysisText } = require('./formatters/textFormatter');
+const { displayRecommendations, displayVulnerabilities } = require('./formatters/reporter');
 
 // Force chalk to enable colors for non-TTY environments when needed
 if (process.env.FORCE_COLOR) {
@@ -24,32 +29,32 @@ if (process.env.FORCE_COLOR) {
  * @param {string} startDir - Starting directory
  * @returns {string|null} Path to package.json or null if not found
  */
-function findPackageJson(startDir) {
+function findPackageJson (startDir) {
   let currentDir = startDir;
-  
+
   // Set a limit to avoid infinite loops
   let iterations = 0;
   const maxIterations = 10;
-  
+
   while (iterations < maxIterations) {
     const packageJsonPath = path.join(currentDir, 'package.json');
-    
+
     if (fs.existsSync(packageJsonPath)) {
       return packageJsonPath;
     }
-    
+
     // Go up one directory
     const parentDir = path.dirname(currentDir);
-    
+
     // If we're at the root directory, stop searching
     if (parentDir === currentDir) {
       break;
     }
-    
+
     currentDir = parentDir;
     iterations++;
   }
-  
+
   return null;
 }
 
@@ -58,31 +63,31 @@ function findPackageJson(startDir) {
  * @param {string} excludeTypes - Comma-separated list of types to exclude
  * @returns {Object} Object with boolean flags for each type
  */
-function parseExcludeTypes(excludeTypes) {
+function parseExcludeTypes (excludeTypes) {
   const result = {
     excludeDev: false,
     excludePeer: false,
     excludeOptional: false
   };
-  
+
   if (!excludeTypes) {
     return result;
   }
-  
+
   const types = excludeTypes.split(',').map(t => t.trim().toLowerCase());
-  
+
   if (types.includes('dev')) {
     result.excludeDev = true;
   }
-  
+
   if (types.includes('peer')) {
     result.excludePeer = true;
   }
-  
+
   if (types.includes('optional')) {
     result.excludeOptional = true;
   }
-  
+
   return result;
 }
 
@@ -91,11 +96,11 @@ function parseExcludeTypes(excludeTypes) {
  * @param {string} sourceString - Comma-separated list of security sources
  * @returns {Array<string>} Array of security source names
  */
-function parseSecuritySources(sourceString) {
+function parseSecuritySources (sourceString) {
   if (!sourceString) {
     return ['NPM_AUDIT'];
   }
-  
+
   return sourceString.split(',').map(s => s.trim().toUpperCase());
 }
 
@@ -104,16 +109,16 @@ function parseSecuritySources(sourceString) {
  * @param {string} level - Drift level
  * @returns {string} Colored drift level
  */
-function formatDriftLevel(level) {
+function formatDriftLevel (level) {
   if (!level) return chalk.gray('unknown');
-  
+
   switch (level.toLowerCase()) {
-    case 'critical': return chalk.red.bold('Critical');
-    case 'high': return chalk.red('High');
-    case 'medium': return chalk.yellow('Medium');
-    case 'low': return chalk.green('Low');
-    case 'none': return chalk.green('None');
-    default: return chalk.gray(level);
+  case 'critical': return chalk.red.bold('Critical');
+  case 'high': return chalk.red('High');
+  case 'medium': return chalk.yellow('Medium');
+  case 'low': return chalk.green('Low');
+  case 'none': return chalk.green('None');
+  default: return chalk.gray(level);
   }
 }
 
@@ -122,16 +127,16 @@ function formatDriftLevel(level) {
  * @param {string} severity - Security severity
  * @returns {string} Colored security severity
  */
-function formatSecuritySeverity(severity) {
+function formatSecuritySeverity (severity) {
   if (!severity) return chalk.gray('unknown');
-  
+
   switch (severity.toLowerCase()) {
-    case 'critical': return chalk.bgRed.white.bold(' Critical ');
-    case 'high': return chalk.bgRed.white(' High ');
-    case 'medium': return chalk.bgYellow.black(' Medium ');
-    case 'low': return chalk.bgGreen.black(' Low ');
-    case 'none': return chalk.green('None');
-    default: return chalk.gray(severity);
+  case 'critical': return chalk.bgRed.white.bold(' Critical ');
+  case 'high': return chalk.bgRed.white(' High ');
+  case 'medium': return chalk.bgYellow.black(' Medium ');
+  case 'low': return chalk.bgGreen.black(' Low ');
+  case 'none': return chalk.green('None');
+  default: return chalk.gray(severity);
   }
 }
 
@@ -140,7 +145,7 @@ function formatSecuritySeverity(severity) {
  * @param {number} days - Days behind
  * @returns {string} Formatted time ago
  */
-function formatTimeAgo(days) {
+function formatTimeAgo (days) {
   if (days === 0) return chalk.green('Today');
   if (days === 1) return chalk.green('Yesterday');
   if (days < 30) return chalk.green(`${days} days ago`);
@@ -149,7 +154,7 @@ function formatTimeAgo(days) {
     const months = Math.floor(days / 30);
     return chalk.yellow(`${months} ${months === 1 ? 'month' : 'months'} ago`);
   }
-  
+
   const years = Math.floor(days / 365);
   return chalk.red(`${years} ${years === 1 ? 'year' : 'years'} ago`);
 }
@@ -159,7 +164,7 @@ function formatTimeAgo(days) {
  * @param {Object} results - Analysis results
  * @returns {string} Table output
  */
-function generateTable(results) {
+function generateTable (results) {
   // Create a new table
   const table = new Table({
     head: [
@@ -176,10 +181,10 @@ function generateTable(results) {
 
   // Add rows for each dependency
   results.dependencies.forEach(dep => {
-    const hasVulnerabilities = dep.security && 
-      dep.security.vulnerable && 
+    const hasVulnerabilities = dep.security &&
+      dep.security.vulnerable &&
       dep.security.vulnerabilities.length > 0;
-    
+
     // Create update status message
     let updateStatus;
     if (dep.driftLevel === 'none') {
@@ -190,7 +195,7 @@ function generateTable(results) {
 
     // Prepare security info
     let securityInfo = formatSecuritySeverity(dep.security?.highestSeverity || 'none');
-    
+
     if (hasVulnerabilities) {
       const vulnCount = dep.security.vulnerabilities.length;
       securityInfo += `\n${chalk.red(`${vulnCount} ${vulnCount === 1 ? 'issue' : 'issues'}`)}`;
@@ -219,7 +224,7 @@ function generateTable(results) {
  * @param {Object} results - Analysis results
  * @returns {string} HTML report
  */
-function generateHtmlReport(results) {
+function generateHtmlReport (results) {
   // Start with HTML structure
   let html = `
 <!DOCTYPE html>
@@ -343,7 +348,7 @@ function generateHtmlReport(results) {
   results.dependencies.sort((a, b) => {
     // Sort by security severity first
     const securityOrder = { high: 3, medium: 2, low: 1, none: 0 };
-    const securityDiff = 
+    const securityDiff =
       securityOrder[b.security?.highestSeverity || 'none'] -
       securityOrder[a.security?.highestSeverity || 'none'];
 
@@ -353,14 +358,14 @@ function generateHtmlReport(results) {
     const driftOrder = { critical: 4, high: 3, medium: 2, low: 1, none: 0 };
     return driftOrder[b.driftLevel || 'none'] - driftOrder[a.driftLevel || 'none'];
   }).forEach(dep => {
-    const hasVulnerabilities = dep.security && 
-      dep.security.vulnerable && 
+    const hasVulnerabilities = dep.security &&
+      dep.security.vulnerable &&
       dep.security.vulnerabilities.length > 0;
-    
+
     // Create update status message
     let updateStatusHtml;
     if (dep.driftLevel === 'none') {
-      updateStatusHtml = `<span class="up-to-date">Up to date</span>`;
+      updateStatusHtml = '<span class="up-to-date">Up to date</span>';
     } else {
       updateStatusHtml = `<span class="updates-needed">Needs update (${dep.daysBehind} days behind)</span>`;
     }
@@ -376,9 +381,9 @@ function generateHtmlReport(results) {
     // Format last updated date
     let lastUpdatedText;
     if (dep.daysBehind === 0) {
-      lastUpdatedText = "Today";
+      lastUpdatedText = 'Today';
     } else if (dep.daysBehind === 1) {
-      lastUpdatedText = "Yesterday";
+      lastUpdatedText = 'Yesterday';
     } else if (dep.daysBehind < 30) {
       lastUpdatedText = `${dep.daysBehind} days ago`;
     } else if (dep.daysBehind < 365) {
@@ -391,7 +396,7 @@ function generateHtmlReport(results) {
 
     // Prepare security info
     let securityHtml = `<span class="security ${dep.security?.highestSeverity || 'none'}">${dep.security?.highestSeverity || 'none'}</span>`;
-    
+
     if (hasVulnerabilities) {
       const vulnCount = dep.security.vulnerabilities.length;
       securityHtml += `<br>${vulnCount} ${vulnCount === 1 ? 'issue' : 'issues'}`;
@@ -435,7 +440,7 @@ function generateHtmlReport(results) {
     results.dependencies.forEach(dep => {
       if (dep.security && dep.security.vulnerable) {
         html += `<h3>${dep.name}@${dep.currentVersion}</h3>`;
-        
+
         dep.security.vulnerabilities.forEach((vuln, index) => {
           html += `
           <div class="vuln-item">
@@ -450,7 +455,7 @@ function generateHtmlReport(results) {
       }
     });
 
-    html += `</div>`;
+    html += '</div>';
   }
 
   html += `
@@ -461,19 +466,64 @@ function generateHtmlReport(results) {
   return html;
 }
 
+async function processResults (results, argv) {
+  let output;
+  let formattedOutput;
+
+  switch (argv.format) {
+    case 'json': {
+      formattedOutput = JSON.stringify(results, null, 2);
+      break;
+    }
+    case 'csv': {
+      formattedOutput = generateCsvReport(results);
+      break;
+    }
+    case 'table': {
+      formattedOutput = generateTable(results);
+      break;
+    }
+    case 'html': {
+      formattedOutput = generateHtmlReport(results);
+      break;
+    }
+    default: {
+      formattedOutput = formatAnalysisText(results, {
+        includeDetails: true,
+        includeSecurity: true
+      });
+    }
+  }
+
+  if (argv.output) {
+    await fs.writeFile(argv.output, formattedOutput);
+    handleWarning(`Analysis results written to ${argv.output}`);
+  } else {
+    handleWarning(formattedOutput);
+  }
+
+  if (argv.recommendations) {
+    displayRecommendations(results, argv);
+  }
+
+  if (results.securitySummary.vulnerable > 0 && argv.showVulnerabilities) {
+    displayVulnerabilities(results);
+  }
+}
+
 /**
  * Main CLI function
  * @param {Object} argv - Command line arguments
  */
-async function main(argv) {
+async function main (argv) {
   try {
     // Process paths
     let packageJsonPath = argv.path;
-    
+
     if (!packageJsonPath) {
       // Try to find package.json in current directory
       packageJsonPath = findPackageJson(process.cwd());
-      
+
       if (!packageJsonPath) {
         console.error('Error: Could not find package.json in current directory');
         process.exit(1);
@@ -482,7 +532,7 @@ async function main(argv) {
       // Check if the path is a directory or file
       if (fs.statSync(packageJsonPath).isDirectory()) {
         packageJsonPath = findPackageJson(packageJsonPath);
-        
+
         if (!packageJsonPath) {
           console.error(`Error: Could not find package.json in ${argv.path}`);
           process.exit(1);
@@ -492,11 +542,11 @@ async function main(argv) {
         process.exit(1);
       }
     }
-    
+
     // Set up analysis options
     const { excludeDev, excludePeer, excludeOptional } = parseExcludeTypes(argv.excludeTypes);
     const securitySources = parseSecuritySources(argv.securitySources);
-    
+
     const options = {
       includeDevDependencies: !excludeDev,
       includePeerDependencies: !excludePeer,
@@ -506,265 +556,56 @@ async function main(argv) {
       useCache: argv.cache,
       maxConcurrent: argv.maxConcurrent
     };
-    
+
     // Run the analysis
     const results = await assessDependencies(packageJsonPath, options);
-    
+
     // Sort dependencies if requested
     if (argv.sortBy) {
       const sortBy = argv.sortBy.toLowerCase();
       const sortDirection = argv.sortDirection.toLowerCase() === 'asc' ? 1 : -1;
-      
+
       results.dependencies.sort((a, b) => {
         let aValue, bValue;
-        
+
         switch (sortBy) {
-          case 'name':
-            return sortDirection * a.name.localeCompare(b.name);
-          case 'driftlevel':
-            const driftOrder = { critical: 4, high: 3, medium: 2, low: 1, none: 0 };
-            aValue = driftOrder[a.driftLevel || 'none'];
-            bValue = driftOrder[b.driftLevel || 'none'];
-            break;
-          case 'daysbehind':
-            aValue = a.daysBehind || 0;
-            bValue = b.daysBehind || 0;
-            break;
-          case 'security':
-            const securityOrder = { critical: 3, high: 2, medium: 1, low: 0, none: -1 };
-            aValue = securityOrder[a.security?.highestSeverity || 'none'];
-            bValue = securityOrder[b.security?.highestSeverity || 'none'];
-            break;
-          default:
-            return 0;
+        case 'name':
+          return sortDirection * a.name.localeCompare(b.name);
+        case 'driftlevel':
+          const driftOrder = { critical: 4, high: 3, medium: 2, low: 1, none: 0 };
+          aValue = driftOrder[a.driftLevel || 'none'];
+          bValue = driftOrder[b.driftLevel || 'none'];
+          break;
+        case 'daysbehind':
+          aValue = a.daysBehind || 0;
+          bValue = b.daysBehind || 0;
+          break;
+        case 'security':
+          const securityOrder = { critical: 3, high: 2, medium: 1, low: 0, none: -1 };
+          aValue = securityOrder[a.security?.highestSeverity || 'none'];
+          bValue = securityOrder[b.security?.highestSeverity || 'none'];
+          break;
+        default:
+          return 0;
         }
-        
+
         return sortDirection * (bValue - aValue);
       });
     }
-    
+
     // Filter dependencies to show only outdated ones if requested
     if (!argv.showAll) {
-      results.dependencies = results.dependencies.filter(dep => 
-        dep.driftLevel !== 'none' || 
+      results.dependencies = results.dependencies.filter(dep =>
+        dep.driftLevel !== 'none' ||
         (dep.security && dep.security.vulnerable)
       );
     }
-    
+
     // Generate output
-    let output;
-    
-    console.log('Debug: generating output with format:', argv.format);
-    
-    switch (argv.format.toLowerCase()) {
-      case 'json':
-        output = formatAnalysisJson(results);
-        break;
-      case 'csv':
-        output = formatAnalysisCSV(results);
-        break;
-      case 'improved-table':
-        // Use the improved table formatter
-        const recommendations = generateRecommendations(results, {
-          maxRecommendations: argv.maxRecommendations
-        });
-        
-        output = formatAnalysisAsTables(results, recommendations, {
-          includeSecurity: !argv.noSecurity,
-          sortBy: argv.sortBy === 'driftLevel' ? 'drift' : argv.sortBy,
-          useImprovedFormat: true
-        });
-        break;
-      case 'table':
-        output = `
-📊 ${chalk.bold('Dependency Analysis')} - ${chalk.cyan.bold(results.projectName)}@${results.projectVersion}
-
-${generateTable(results)}
-
-${chalk.bold('Explanation:')}
-- ${chalk.cyan.bold('Update Status')}: Shows if you need to update the package
-- ${chalk.cyan.bold('Last Updated')}: When the latest version was published
-- ${chalk.cyan.bold('Drift')}: How far your version is behind the latest
-- ${chalk.cyan.bold('Security')}: Highest severity of any known vulnerabilities
-
-${chalk.bold('Overall Assessment:')}
-Status: ${results.overallAssessment.status === 'Poor' ? chalk.red.bold(results.overallAssessment.status) : chalk.green.bold(results.overallAssessment.status)}
-Outdated: ${results.overallAssessment.outdatedDependencies} of ${results.overallAssessment.totalDependencies}
-Vulnerable: ${results.securitySummary.vulnerable} of ${results.securitySummary.total}
-`;
-        break;
-      case 'html':
-        output = generateHtmlReport(results);
-        break;
-      default:
-        output = formatAnalysisText(results, {
-          includeDetails: true,
-          includeSecurity: true
-        });
-    }
-    
-    console.log('Debug: output generated, length:', output?.length);
-    console.log('Debug: output sample:', output?.substring(0, 100));
-    
-    // Display results to console or write to file
-    if (argv.output) {
-      fs.writeFileSync(argv.output, output);
-      console.log(`Analysis results written to ${argv.output}`);
-    } else {
-      console.log(output);
-    }
-    
-    // Generate recommendations if requested
-    if (argv.recommendations) {
-      const recommendations = generateRecommendations(results, {
-        maxRecommendations: argv.maxRecommendations
-      });
-      
-      if (recommendations.length > 0) {
-        console.log(`\n${chalk.bold('Top Recommendations:')}`);
-        recommendations.forEach((rec, index) => {
-          console.log(`[${index + 1}] ${rec.dependencyName}@${rec.currentVersion}: ${rec.recommendation}`);
-          console.log(`   Details: ${rec.details}`);
-        });
-      } else {
-        console.log(`\n${chalk.green('✓')} No recommendations needed - everything looks good!`);
-      }
-    }
-    
-    // Display security vulnerabilities details if any
-    if (results.securitySummary.vulnerable > 0 && argv.showVulnerabilities) {
-      console.log(`\n${chalk.red.bold('Security Vulnerabilities Found:')}`);
-      
-      results.dependencies.forEach(dep => {
-        if (dep.security && dep.security.vulnerable) {
-          console.log(`\n${chalk.red.bold(dep.name)}@${dep.currentVersion}:`);
-          
-          dep.security.vulnerabilities.forEach((vuln, index) => {
-            console.log(`  [${index + 1}] ${chalk.red(vuln.title)} (${vuln.severity})`);
-            console.log(`      ID: ${vuln.id}`);
-            console.log(`      URL: ${vuln.url || 'N/A'}`);
-            console.log(`      Patched in: ${vuln.patchedIn}`);
-            console.log(`      Recommendation: ${vuln.recommendation}`);
-          });
-        }
-      });
-    }
-    
+    await processResults(results, argv);
   } catch (error) {
-    console.error('Error:', error.message);
-    process.exit(1);
+    handleError(error, 'An error occurred while running the analysis');
   }
 }
 
-// Set up CLI
-const argv = yargs(hideBin(process.argv))
-  .command('$0', 'Display the version number', () => {
-    console.log(require('../package.json').version);
-  })
-  .command('analyze', 'Analyze dependency drift and security vulnerabilities', yargs => {
-    return yargs
-      .option('path', {
-        alias: 'p',
-        describe: 'Path to the package.json file or project directory',
-        type: 'string'
-      })
-      .option('output', {
-        alias: 'o',
-        describe: 'Output file path',
-        type: 'string'
-      })
-      .option('format', {
-        alias: 'f',
-        describe: 'Output format',
-        choices: ['text', 'json', 'table', 'improved-table', 'html'],
-        default: 'text',
-        group: 'Output Options',
-      })
-      .option('show-all', {
-        alias: 'a',
-        describe: 'Show all dependencies, not just outdated ones',
-        type: 'boolean',
-        default: false
-      })
-      .option('sort-by', {
-        alias: 's',
-        describe: 'Sort dependencies by field',
-        choices: ['name', 'driftLevel', 'daysBehind', 'security'],
-        default: 'driftLevel'
-      })
-      .option('sort-direction', {
-        alias: 'd',
-        describe: 'Sort direction',
-        choices: ['asc', 'desc'],
-        default: 'desc'
-      })
-      .option('exclude-types', {
-        alias: 'e',
-        describe: 'Exclude dependency types',
-        type: 'string'
-      })
-      .option('cache', {
-        alias: 'c',
-        describe: 'Use cache for npm registry requests',
-        type: 'boolean',
-        default: true
-      })
-      .option('max-concurrent', {
-        describe: 'Maximum number of concurrent requests',
-        type: 'number',
-        default: 5
-      })
-      .option('no-security', {
-        describe: 'Skip security vulnerability checks',
-        type: 'boolean',
-        default: false
-      })
-      .option('security-sources', {
-        describe: 'Security sources to check',
-        type: 'string',
-        default: 'NPM_AUDIT'
-      })
-      .option('recommendations', {
-        alias: 'r',
-        describe: 'Show recommendations for updates',
-        type: 'boolean',
-        default: true
-      })
-      .option('max-recommendations', {
-        describe: 'Maximum number of recommendations to show',
-        type: 'number',
-        default: 5
-      })
-      .option('show-vulnerabilities', {
-        alias: 'v',
-        describe: 'Show detailed vulnerability information',
-        type: 'boolean',
-        default: true
-      });
-  }, async (argv) => {
-    console.log('Debug: analyze command handler started');
-    console.log('Debug: argv =', JSON.stringify(argv, null, 2));
-    
-    try {
-      console.log('Debug: calling main function');
-      const result = await main(argv);
-      console.log('Debug: main function completed', result ? 'with result' : 'with no result');
-    } catch (error) {
-      console.error('Error in analyze command:', error);
-      process.exit(1);
-    }
-  })
-  .help()
-  .alias('help', 'h')
-  .version()
-  .alias('version', 'v')
-  .parse();
-
-// Try-catch for any unhandled promise rejections
-process.on('unhandledRejection', error => {
-  console.error('Error:', error.message);
-  process.exit(1);
-});
-
-// Export the main function for testing
-module.exports = { main }; 
+module.exports = { main };
