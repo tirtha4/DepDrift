@@ -3,11 +3,15 @@
  * @module core/assessor
  */
 
-const { analyzePackage } = require('../analyzers/packageAnalyzer');
-const { analyzeSecurity } = require('../analyzers/securityAnalyzer');
-const { summarizeDriftLevels } = require('../utils/driftUtils');
-const fs = require('fs-extra');
-const path = require('path');
+import { analyzePackage } from '../analyzers/packageAnalyzer.js';
+import { analyzeSecurity } from '../analyzers/securityAnalyzer.js';
+import { summarizeDriftLevels } from '../utils/driftUtils.js';
+import fs from 'fs-extra';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * Assesses dependencies in a package.json file for drift and security issues
@@ -23,7 +27,7 @@ const path = require('path');
  * @returns {Promise<Object>} Assessment results including drift and security data
  * @throws {Error} If the package.json file cannot be found or parsed
  */
-async function assessDependencies (packageJsonPath, options = {}) {
+export async function assessDependencies (packageJsonPath, options = {}) {
   const {
     includeDevDependencies = true,
     includePeerDependencies = true,
@@ -365,7 +369,7 @@ async function batchAssessDependencies (projectPaths, options = {}) {
   return results;
 }
 
-module.exports = {
+export {
   assessDependencies,
   generateRecommendations,
   batchAssessDependencies
