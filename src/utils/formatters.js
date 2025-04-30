@@ -11,7 +11,7 @@
  * @module utils/formatters
  */
 
-const chalk = require('chalk');
+import chalk from 'chalk';
 
 /**
  * Formats a drift level with color coding for terminal output
@@ -467,11 +467,17 @@ function escapeCsvField (field) {
   return field;
 }
 
-module.exports = {
+export {
   formatDriftLevel,
   formatSecuritySeverity,
   formatVersion,
   formatAnalysisText,
   formatAnalysisJson,
-  formatAnalysisCSV
+  formatAnalysisCSV,
+  formatAssessmentStatus,
+  formatScore,
+  formatDaysBehind,
+  formatDepType,
+  getDepType,
+  sortDependencies
 };

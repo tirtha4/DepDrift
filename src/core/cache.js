@@ -3,10 +3,10 @@
  * @module core/cache
  */
 
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
-const crypto = require('crypto');
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
+import crypto from 'crypto';
 
 // Default cache directory
 const DEFAULT_CACHE_DIR = path.join(os.homedir(), '.depdrift', 'cache');
@@ -364,7 +364,27 @@ async function cacheAnalysisResult (packagePath, analysisData, options = {}) {
   }
 }
 
-module.exports = {
+/**
+ * General purpose cache getter
+ * @param {string} key - Cache key
+ * @param {Object} [options={}] - Cache options
+ * @returns {Object|null} Cached data or null if not found
+ */
+function getCache(key, options = {}) {
+  return getCachedPackageInfo(key, options);
+}
+
+/**
+ * General purpose cache setter
+ * @param {string} key - Cache key
+ * @param {Object} data - Data to cache
+ * @param {Object} [options={}] - Cache options
+ */
+function setCache(key, data, options = {}) {
+  cachePackageInfo(key, data, options);
+}
+
+export {
   initCache,
   getCachedPackageInfo,
   cachePackageInfo,
@@ -373,5 +393,7 @@ module.exports = {
   DEFAULT_CACHE_DIR,
   getCacheKey,
   getCachedAnalysis,
-  cacheAnalysisResult
+  cacheAnalysisResult,
+  getCache,
+  setCache
 };

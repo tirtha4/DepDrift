@@ -3,9 +3,9 @@
  * @module core/registry
  */
 
-const axios = require('axios');
-const semver = require('semver');
-const { initCache, getCachedPackageInfo, cachePackageInfo } = require('./cache');
+import axios from 'axios';
+import semver from 'semver';
+import { initCache, getCachedPackageInfo, cachePackageInfo } from './cache.js';
 
 // Default registry URL
 const DEFAULT_REGISTRY = 'https://registry.npmjs.org';
@@ -136,7 +136,7 @@ function getNpmRegistry () {
   return npmRegistryInstance;
 }
 
-module.exports = {
+export {
   createRegistry,
   getNpmRegistry,
   DEFAULT_REGISTRY

@@ -11,7 +11,7 @@ import { promisify } from 'util';
 import axios from 'axios';
 import { getCache, setCache } from '../core/cache.js';
 import semver from 'semver';
-import { satisfiesRange } from '../utils/driftUtils';
+import { satisfiesRange } from '../utils/driftUtils.js';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
@@ -590,7 +590,7 @@ function normalizeVulnerability(vuln, source, currentVersion) {
   };
 }
 
-module.exports = {
+export {
   analyzeSecurity,
   checkVulnerabilities,
   VULNERABILITY_SOURCES

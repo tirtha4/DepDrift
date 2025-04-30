@@ -146,7 +146,8 @@ async function main(argv) {
     // Use the formatter based on the format option
     if (argv.format === 'table') {
       // Import the table formatter
-      const { formatAnalysisAsTables } = require('../src/formatters/tableFormatter');
+      const tableFormatter = await import('../src/formatters/tableFormatter.js');
+      const { formatAnalysisAsTables } = tableFormatter;
       
       // Generate recommendations
       const recommendations = generateRecommendations(results, {

@@ -3,9 +3,9 @@
  * @module formatters/tableFormatter
  */
 
-const Table = require('cli-table3');
-const chalk = require('chalk');
-const { formatDriftLevel, formatSecuritySeverity } = require('../utils/formatters');
+import Table from 'cli-table3';
+import chalk from 'chalk';
+import { formatDriftLevel, formatSecuritySeverity } from '../utils/formatters.js';
 
 /**
  * Get terminal width
@@ -618,11 +618,10 @@ function getSecurityColor (severity) {
   }
 }
 
-module.exports = {
+export {
+  formatAnalysisAsTables,
   createDependencyTable,
   createSummaryTable,
   createRecommendationsTable,
-  formatAnalysisAsTables,
-  createExplanationBlock,
-  formatTimeAgo
+  createExplanationBlock
 };

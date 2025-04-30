@@ -5,16 +5,15 @@
  * calculates drift levels, and provides utilities for version comparison and range parsing.
  */
 
-const path = require('path');
-const fs = require('fs-extra');
-const { getNpmRegistry } = require('../core/registry');
-const semver = require('semver');
-const axios = require('axios');
-const { initCache } = require('../core/cache');
-const { summarizeDriftLevels } = require('../utils/driftUtils');
-const { exec } = require('child_process');
-const { promisify } = require('util');
-const { getCache, setCache } = require('../core/cache.js');
+import path from 'path';
+import fs from 'fs-extra';
+import { getNpmRegistry } from '../core/registry.js';
+import semver from 'semver';
+import axios from 'axios';
+import { initCache, getCache, setCache } from '../core/cache.js';
+import { summarizeDriftLevels } from '../utils/driftUtils.js';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
 /**
  * Calculate days between two dates
@@ -582,18 +581,13 @@ async function getPackageVersions(packageName) {
   }
 }
 
-// Export functions
-module.exports = {
+export {
   analyzePackage,
   analyzeDependency,
-  determineDriftLevel,
-  determineDriftLevelByDays,
-  daysBetween,
-  calculateDriftLevel,
-  calculateDriftLevelByDays,
   fetchNpmPackageInfo,
   parseVersionRange,
   isPreRelease,
   satisfiesRange,
-  getPackageVersions
+  getPackageVersions,
+  determineDriftLevel
 };
