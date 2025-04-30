@@ -19,27 +19,27 @@ const glob = require('glob');
  * @throws {Error} If filesystem operations fail
  * @public
  */
-async function detectWorkspace(projectPath) {
+async function detectWorkspace (projectPath) {
   const packageJsonPath = path.join(projectPath, 'package.json');
-  
+
   if (!await fs.pathExists(packageJsonPath)) {
     return { isWorkspace: false };
   }
-  
+
   try {
     const packageJson = await fs.readJson(packageJsonPath);
-    
+
     // Check for npm workspaces
     if (packageJson.workspaces) {
       return {
         isWorkspace: true,
         type: 'npm',
-        patterns: Array.isArray(packageJson.workspaces) 
-          ? packageJson.workspaces 
+        patterns: Array.isArray(packageJson.workspaces)
+          ? packageJson.workspaces
           : packageJson.workspaces.packages || []
       };
     }
-    
+
     // Check for pnpm workspace
     const pnpmWorkspacePath = path.join(projectPath, 'pnpm-workspace.yaml');
     if (await fs.pathExists(pnpmWorkspacePath)) {
@@ -48,14 +48,14 @@ async function detectWorkspace(projectPath) {
         .split('\n')
         .filter(line => line.trim().startsWith('- '))
         .map(line => line.replace(/^-\s+/, '').trim());
-      
+
       return {
         isWorkspace: true,
         type: 'pnpm',
         patterns: packages
       };
     }
-    
+
     // Check for yarn workspace
     const lernaCfgPath = path.join(projectPath, 'lerna.json');
     if (await fs.pathExists(lernaCfgPath)) {
@@ -66,7 +66,7 @@ async function detectWorkspace(projectPath) {
         patterns: lernaCfg.packages || ['packages/*']
       };
     }
-    
+
     return { isWorkspace: false };
   } catch (error) {
     console.error(`Error detecting workspace: ${error.message}`);
@@ -85,37 +85,37 @@ async function detectWorkspace(projectPath) {
  * // Find all package.json files in a workspace
  * const packagePaths = await findWorkspacePackages('/path/to/project', ['packages/*']);
  */
-async function findWorkspacePackages(rootPath, patterns) {
+async function findWorkspacePackages (rootPath, patterns) {
   const packagePaths = [];
-  
+
   // Process each pattern
   for (const pattern of patterns) {
     // Find directories matching the pattern
-    const matches = glob.sync(pattern, { 
-      cwd: rootPath, 
+    const matches = glob.sync(pattern, {
+      cwd: rootPath,
       absolute: true
     });
-    
+
     // For each matched directory, check if package.json exists
     for (const match of matches) {
       const stats = await fs.stat(match);
-      
+
       if (stats.isDirectory()) {
         const packageJsonPath = path.join(match, 'package.json');
-        
+
         if (await fs.pathExists(packageJsonPath)) {
           packagePaths.push(packageJsonPath);
         }
       }
     }
   }
-  
+
   // Add root package.json as well
   const rootPackagePath = path.join(rootPath, 'package.json');
   if (await fs.pathExists(rootPackagePath) && !packagePaths.includes(rootPackagePath)) {
     packagePaths.push(rootPackagePath);
   }
-  
+
   return packagePaths;
 }
 
@@ -132,7 +132,7 @@ async function findWorkspacePackages(rootPath, patterns) {
  * @throws {Error} If filesystem operations fail
  * @public
  */
-async function loadWorkspacePackages(rootPath, workspace) {
+async function loadWorkspacePackages (rootPath, workspace) {
   if (!workspace.isWorkspace) {
     // If not a workspace, just return the root package
     const rootPackagePath = path.join(rootPath, 'package.json');
@@ -147,13 +147,13 @@ async function loadWorkspacePackages(rootPath, workspace) {
     }
     return [];
   }
-  
+
   // Find all package.json files in the workspace
   const packagePaths = await findWorkspacePackages(rootPath, workspace.patterns);
-  
+
   // Load each package.json
   const packages = [];
-  
+
   for (const packagePath of packagePaths) {
     try {
       const packageJson = await fs.readJson(packagePath);
@@ -166,7 +166,7 @@ async function loadWorkspacePackages(rootPath, workspace) {
       console.error(`Error reading ${packagePath}: ${error.message}`);
     }
   }
-  
+
   return packages;
 }
 
@@ -183,16 +183,16 @@ async function loadWorkspacePackages(rootPath, workspace) {
  * const internalDeps = getInternalDependencies(packages);
  * // Result: { '@org/pkg1': 'packages/pkg1', '@org/pkg2': 'packages/pkg2' }
  */
-function getInternalDependencies(packages) {
+function getInternalDependencies (packages) {
   const internalDeps = {};
-  
+
   // First, collect all package names with their paths
   packages.forEach(pkg => {
     if (pkg.packageJson.name) {
       internalDeps[pkg.packageJson.name] = pkg.relativePath || '.';
     }
   });
-  
+
   return internalDeps;
 }
 
@@ -201,4 +201,4 @@ module.exports = {
   findWorkspacePackages,
   loadWorkspacePackages,
   getInternalDependencies
-}; 
+};

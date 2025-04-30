@@ -21,18 +21,18 @@ let npmRegistryInstance = null;
  * @param {number} [options.cacheTTL=3600000] - Cache time-to-live in milliseconds (default: 1 hour)
  * @returns {Object} Registry interface object with methods for fetching package data
  */
-function createRegistry(options = {}) {
+function createRegistry (options = {}) {
   const {
     registryUrl = DEFAULT_REGISTRY,
     useCache = true,
     cacheTTL = 3600000 // 1 hour
   } = options;
-  
+
   // Initialize cache if using it
   if (useCache) {
     initCache({ ttl: cacheTTL });
   }
-  
+
   return {
     /**
      * Gets complete package information from the registry
@@ -40,7 +40,7 @@ function createRegistry(options = {}) {
      * @returns {Promise<Object>} Package information including versions, dist-tags, and metadata
      * @throws {Error} If package is not found or request fails
      */
-    async getPackageInfo(packageName) {
+    async getPackageInfo (packageName) {
       // Check cache first if enabled
       if (useCache) {
         const cachedInfo = getCachedPackageInfo(packageName);
@@ -48,19 +48,19 @@ function createRegistry(options = {}) {
           return cachedInfo;
         }
       }
-      
+
       try {
         // Encode package name for URL safety
         const encodedPackageName = encodeURIComponent(packageName);
-        
+
         // Make the registry request
         const response = await axios.get(`${registryUrl}/${encodedPackageName}`);
-        
+
         // Cache the result if caching is enabled
         if (useCache && response.data) {
           cachePackageInfo(packageName, response.data);
         }
-        
+
         return response.data;
       } catch (error) {
         if (error.response && error.response.status === 404) {
@@ -69,29 +69,29 @@ function createRegistry(options = {}) {
         throw new Error(`Failed to fetch package info: ${error.message}`);
       }
     },
-    
+
     /**
      * Gets all available versions for a package
      * @param {string} packageName - Package name
      * @returns {Promise<Array<string>>} List of all available version strings
      * @throws {Error} If package info cannot be retrieved
      */
-    async getPackageVersions(packageName) {
+    async getPackageVersions (packageName) {
       const info = await this.getPackageInfo(packageName);
       return Object.keys(info.versions || {});
     },
-    
+
     /**
      * Gets the latest version of a package
      * @param {string} packageName - Package name
      * @returns {Promise<string>} Latest version string
      * @throws {Error} If package info cannot be retrieved
      */
-    async getLatestVersion(packageName) {
+    async getLatestVersion (packageName) {
       const info = await this.getPackageInfo(packageName);
       return info['dist-tags']?.latest;
     },
-    
+
     /**
      * Finds the highest version that satisfies a semver range
      * @param {string} packageName - Package name
@@ -99,11 +99,11 @@ function createRegistry(options = {}) {
      * @returns {Promise<string|null>} Highest matching version or null if none satisfies
      * @throws {Error} If package info cannot be retrieved
      */
-    async getHighestMatchingVersion(packageName, versionRange) {
+    async getHighestMatchingVersion (packageName, versionRange) {
       const versions = await this.getPackageVersions(packageName);
       return semver.maxSatisfying(versions, versionRange);
     },
-    
+
     /**
      * Gets the publication time for a specific version
      * @param {string} packageName - Package name
@@ -111,14 +111,14 @@ function createRegistry(options = {}) {
      * @returns {Promise<Date>} The publication timestamp as a Date object
      * @throws {Error} If publication time is not found or package info cannot be retrieved
      */
-    async getVersionTime(packageName, version) {
+    async getVersionTime (packageName, version) {
       const info = await this.getPackageInfo(packageName);
       const timeStr = info.time?.[version];
-      
+
       if (!timeStr) {
         throw new Error(`Publication time not found for ${packageName}@${version}`);
       }
-      
+
       return new Date(timeStr);
     }
   };
@@ -129,7 +129,7 @@ function createRegistry(options = {}) {
  * Creates a new instance if one doesn't already exist
  * @returns {Object} Default npm registry interface with standard configuration
  */
-function getNpmRegistry() {
+function getNpmRegistry () {
   if (!npmRegistryInstance) {
     npmRegistryInstance = createRegistry();
   }
@@ -140,4 +140,4 @@ module.exports = {
   createRegistry,
   getNpmRegistry,
   DEFAULT_REGISTRY
-}; 
+};

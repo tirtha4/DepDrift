@@ -1,9 +1,9 @@
 /**
  * DepDrift Core Module
- * 
+ *
  * This module exports the core functionality of DepDrift, including
  * dependency assessment, cache management, and package registry access.
- * 
+ *
  * @module core
  */
 
@@ -21,16 +21,16 @@ module.exports = {
   generateRecommendations,
   batchAssessDependencies,
   buildGraphs,
-  
+
   // Registry access
   registry: {
     getNpmRegistry,
     createRegistry,
     DEFAULT_REGISTRY
   },
-  
+
   // Cache management
   cache: {
     ...cacheUtils
   }
-}; 
+};

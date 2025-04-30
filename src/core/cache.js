@@ -23,15 +23,15 @@ let cacheTTL = 24 * 60 * 60 * 1000; // 24 hours by default
  * @param {number} [options.ttl=24*60*60*1000] - Cache time-to-live in milliseconds (default: 24 hours)
  * @returns {Object} Cache configuration including directory and TTL
  */
-function initCache(options = {}) {
+function initCache (options = {}) {
   const { cacheDir = DEFAULT_CACHE_DIR, ttl = 24 * 60 * 60 * 1000 } = options;
-  
+
   // Ensure cache directory exists
   fs.ensureDirSync(cacheDir);
-  
+
   // Set cache TTL
   cacheTTL = ttl;
-  
+
   return {
     cacheDir,
     ttl: cacheTTL
@@ -46,42 +46,42 @@ function initCache(options = {}) {
  * @param {number} [options.maxAge=cacheTTL] - Maximum age of cache entry in milliseconds
  * @returns {Object|null} Cached package information or null if not found/expired
  */
-function getCachedPackageInfo(packageName, options = {}) {
+function getCachedPackageInfo (packageName, options = {}) {
   const { cacheDir = DEFAULT_CACHE_DIR, maxAge = cacheTTL } = options;
-  
+
   // Check memory cache first
   if (memoryCache.has(packageName)) {
     const timestamp = cacheTimestamps.get(packageName) || 0;
     const now = Date.now();
-    
+
     if (now - timestamp < maxAge) {
       return memoryCache.get(packageName);
     }
-    
+
     // Expired, remove from memory cache
     memoryCache.delete(packageName);
     cacheTimestamps.delete(packageName);
   }
-  
+
   // Check file cache
   const cacheFile = getCacheFilePath(packageName, cacheDir);
-  
+
   try {
     if (fs.existsSync(cacheFile)) {
       const stats = fs.statSync(cacheFile);
       const now = Date.now();
-      
+
       // Check if cache is still valid
       if (now - stats.mtimeMs < maxAge) {
         const cachedData = fs.readJsonSync(cacheFile);
-        
+
         // Store in memory cache
         memoryCache.set(packageName, cachedData);
         cacheTimestamps.set(packageName, stats.mtimeMs);
-        
+
         return cachedData;
       }
-      
+
       // Cache expired, remove it
       fs.unlinkSync(cacheFile);
     }
@@ -89,7 +89,7 @@ function getCachedPackageInfo(packageName, options = {}) {
     // If reading fails, consider cache invalid
     console.warn(`Cache read failed for ${packageName}:`, error.message);
   }
-  
+
   return null;
 }
 
@@ -101,16 +101,16 @@ function getCachedPackageInfo(packageName, options = {}) {
  * @param {string} [options.cacheDir=DEFAULT_CACHE_DIR] - Directory to store cache files
  * @returns {void}
  */
-function cachePackageInfo(packageName, packageInfo, options = {}) {
+function cachePackageInfo (packageName, packageInfo, options = {}) {
   const { cacheDir = DEFAULT_CACHE_DIR } = options;
-  
+
   // Store in memory cache
   memoryCache.set(packageName, packageInfo);
   cacheTimestamps.set(packageName, Date.now());
-  
+
   // Store in file cache
   const cacheFile = getCacheFilePath(packageName, cacheDir);
-  
+
   try {
     fs.ensureDirSync(path.dirname(cacheFile));
     fs.writeJsonSync(cacheFile, packageInfo, { spaces: 2 });
@@ -126,7 +126,7 @@ function cachePackageInfo(packageName, packageInfo, options = {}) {
  * @param {string} cacheDir - Base cache directory
  * @returns {string} Full path to the cache file
  */
-function getCacheFilePath(packageName, cacheDir) {
+function getCacheFilePath (packageName, cacheDir) {
   // Handle scoped packages
   const safeName = packageName.replace(/\//g, '+');
   return path.join(cacheDir, `${safeName}.json`);
@@ -139,10 +139,10 @@ function getCacheFilePath(packageName, cacheDir) {
  * @param {number} [options.maxAge=cacheTTL] - Maximum age of entries to keep in milliseconds
  * @returns {number} Total number of cleared cache entries (memory + file)
  */
-function clearExpiredCache(options = {}) {
+function clearExpiredCache (options = {}) {
   const { cacheDir = DEFAULT_CACHE_DIR, maxAge = cacheTTL } = options;
   let cleared = 0;
-  
+
   // Clear expired memory cache
   const now = Date.now();
   for (const [packageName, timestamp] of cacheTimestamps.entries()) {
@@ -152,17 +152,17 @@ function clearExpiredCache(options = {}) {
       cleared++;
     }
   }
-  
+
   // Clear expired file cache
   if (fs.existsSync(cacheDir)) {
     try {
       const files = fs.readdirSync(cacheDir);
-      
+
       for (const file of files) {
         if (file.endsWith('.json')) {
           const filePath = path.join(cacheDir, file);
           const stats = fs.statSync(filePath);
-          
+
           if (now - stats.mtimeMs > maxAge) {
             fs.unlinkSync(filePath);
             cleared++;
@@ -173,7 +173,7 @@ function clearExpiredCache(options = {}) {
       console.warn('Error clearing expired cache:', error.message);
     }
   }
-  
+
   return cleared;
 }
 
@@ -183,21 +183,21 @@ function clearExpiredCache(options = {}) {
  * @param {string} [options.cacheDir=DEFAULT_CACHE_DIR] - Cache directory to empty
  * @returns {number} Total number of cleared cache entries (memory + file)
  */
-function clearCache(options = {}) {
+function clearCache (options = {}) {
   const { cacheDir = DEFAULT_CACHE_DIR } = options;
   const memoryCount = memoryCache.size;
-  
+
   // Clear memory cache
   memoryCache.clear();
   cacheTimestamps.clear();
-  
+
   // Clear file cache
   let fileCount = 0;
   if (fs.existsSync(cacheDir)) {
     try {
       const files = fs.readdirSync(cacheDir).filter(file => file.endsWith('.json'));
       fileCount = files.length;
-      
+
       // Remove all cache files
       files.forEach(file => {
         fs.unlinkSync(path.join(cacheDir, file));
@@ -206,7 +206,7 @@ function clearCache(options = {}) {
       console.warn('Error clearing cache:', error.message);
     }
   }
-  
+
   return memoryCount + fileCount;
 }
 
@@ -219,15 +219,15 @@ function clearCache(options = {}) {
  * @returns {string} A unique cache key combining package name and hash
  * @private
  */
-function getCacheKey(packageName, options = {}) {
+function getCacheKey (packageName, options = {}) {
   const { scope = 'npm', registry = 'https://registry.npmjs.org' } = options;
-  
+
   // Create a hash of the package name, scope, and registry
   const hash = crypto
     .createHash('md5')
     .update(`${scope}:${registry}:${packageName}`)
     .digest('hex');
-  
+
   return `${packageName.replace('/', '_')}-${hash.substring(0, 8)}`;
 }
 
@@ -250,13 +250,13 @@ function getCacheKey(packageName, options = {}) {
  *   // Perform fresh analysis
  * }
  */
-async function getCachedAnalysis(packagePath, options = {}) {
-  const { 
-    cacheDir = DEFAULT_CACHE_DIR, 
+async function getCachedAnalysis (packagePath, options = {}) {
+  const {
+    cacheDir = DEFAULT_CACHE_DIR,
     maxAge = 24 * 60 * 60 * 1000, // 24 hours in milliseconds
     ignoreIfChanged = true
   } = options;
-  
+
   const packageDir = path.dirname(packagePath);
   const packageFile = path.basename(packagePath);
 
@@ -265,38 +265,38 @@ async function getCachedAnalysis(packagePath, options = {}) {
     .createHash('md5')
     .update(packagePath)
     .digest('hex');
-  
+
   const cacheFileName = `analysis-${hash}.json`;
   const cachePath = path.join(cacheDir, cacheFileName);
-  
+
   try {
     // Check if cache file exists
     if (!await fs.pathExists(cachePath)) {
       return null;
     }
-    
+
     // Read cache file
     const cacheEntry = await fs.readJson(cachePath);
-    
+
     // Check if cache is expired
     const now = Date.now();
     if (now - cacheEntry.timestamp > maxAge) {
       return null;
     }
-    
+
     // If we should check if files have changed
     if (ignoreIfChanged) {
       // Get last modified time of package.json
       const packageStats = await fs.stat(packagePath);
       const packageMtime = packageStats.mtimeMs;
-      
+
       // Check for lock files
       const lockFiles = [
         path.join(packageDir, 'package-lock.json'),
         path.join(packageDir, 'yarn.lock'),
         path.join(packageDir, 'pnpm-lock.yaml')
       ];
-      
+
       // Check if any lock file is newer than the cache
       for (const lockFile of lockFiles) {
         if (await fs.pathExists(lockFile)) {
@@ -306,13 +306,13 @@ async function getCachedAnalysis(packagePath, options = {}) {
           }
         }
       }
-      
+
       // Check if package.json is newer than cache
       if (packageMtime > cacheEntry.timestamp) {
         return null; // Package.json is newer than cache
       }
     }
-    
+
     // Return cached data
     return cacheEntry.data;
   } catch (error) {
@@ -337,18 +337,18 @@ async function getCachedAnalysis(packagePath, options = {}) {
  *   analysisResults
  * );
  */
-async function cacheAnalysisResult(packagePath, analysisData, options = {}) {
+async function cacheAnalysisResult (packagePath, analysisData, options = {}) {
   const { cacheDir = DEFAULT_CACHE_DIR } = options;
-  
+
   // Create unique key for this package
   const hash = crypto
     .createHash('md5')
     .update(packagePath)
     .digest('hex');
-  
+
   const cacheFileName = `analysis-${hash}.json`;
   const cachePath = path.join(cacheDir, cacheFileName);
-  
+
   try {
     // Save cache entry
     await fs.writeJson(cachePath, {
@@ -356,7 +356,7 @@ async function cacheAnalysisResult(packagePath, analysisData, options = {}) {
       packagePath,
       data: analysisData
     });
-    
+
     return true;
   } catch (error) {
     console.error(`Error writing analysis cache: ${error.message}`);
@@ -374,4 +374,4 @@ module.exports = {
   getCacheKey,
   getCachedAnalysis,
   cacheAnalysisResult
-}; 
+};

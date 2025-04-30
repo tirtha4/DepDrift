@@ -23,7 +23,7 @@ const path = require('path');
  * @returns {Promise<Object>} Assessment results including drift and security data
  * @throws {Error} If the package.json file cannot be found or parsed
  */
-async function assessDependencies(packageJsonPath, options = {}) {
+async function assessDependencies (packageJsonPath, options = {}) {
   const {
     includeDevDependencies = true,
     includePeerDependencies = true,
@@ -33,15 +33,15 @@ async function assessDependencies(packageJsonPath, options = {}) {
     useCache = true,
     maxConcurrent = 5
   } = options;
-  
+
   try {
     // Validate and read package.json
     if (!fs.existsSync(packageJsonPath)) {
       throw new Error(`Package.json not found at ${packageJsonPath}`);
     }
-    
+
     const packageJsonContent = await fs.readJson(packageJsonPath);
-    
+
     // Analyze dependency drift
     const driftAnalysis = await analyzePackage(packageJsonContent, {
       excludeDev: !includeDevDependencies,
@@ -50,7 +50,7 @@ async function assessDependencies(packageJsonPath, options = {}) {
       maxConcurrent,
       groupByLevel: true
     });
-    
+
     // Create combined results object
     const results = {
       projectName: packageJsonContent.name,
@@ -62,7 +62,7 @@ async function assessDependencies(packageJsonPath, options = {}) {
       securitySummary: null,
       overallAssessment: null
     };
-    
+
     // Add security analysis if requested
     if (checkSecurity) {
       const securityAnalysis = await analyzeSecurity(driftAnalysis.dependencies, {
@@ -71,13 +71,13 @@ async function assessDependencies(packageJsonPath, options = {}) {
         maxConcurrent,
         packageJsonPath
       });
-      
+
       // Merge security info into dependencies
       results.dependencies = results.dependencies.map(dep => {
         const securityInfo = securityAnalysis.results.find(
           s => s.packageName === dep.name && s.version === dep.currentVersion
         );
-        
+
         if (securityInfo) {
           return {
             ...dep,
@@ -88,7 +88,7 @@ async function assessDependencies(packageJsonPath, options = {}) {
             }
           };
         }
-        
+
         return {
           ...dep,
           security: {
@@ -98,13 +98,13 @@ async function assessDependencies(packageJsonPath, options = {}) {
           }
         };
       });
-      
+
       results.securitySummary = securityAnalysis.summary;
     }
-    
+
     // Calculate overall assessment
     results.overallAssessment = calculateOverallAssessment(results);
-    
+
     return results;
   } catch (error) {
     throw new Error(`Error assessing dependencies: ${error.message}`);
@@ -126,9 +126,9 @@ async function assessDependencies(packageJsonPath, options = {}) {
  * @property {number} outdatedDependencies - Count of outdated dependencies
  * @property {number|null} vulnerableDependencies - Count of vulnerable dependencies
  */
-function calculateOverallAssessment(results) {
+function calculateOverallAssessment (results) {
   const { dependencies, driftSummary, securitySummary } = results;
-  
+
   // Define weights for scoring
   const weights = {
     drift: {
@@ -146,11 +146,11 @@ function calculateOverallAssessment(results) {
       critical: 1
     }
   };
-  
+
   // Calculate raw score (0-100)
   let driftScore = 0;
   let securityScore = 0;
-  
+
   // Calculate drift score
   if (driftSummary) {
     const totalDeps = driftSummary.total || dependencies.length;
@@ -164,28 +164,28 @@ function calculateOverallAssessment(results) {
       driftScore = (driftScore / totalDeps) * 100;
     }
   }
-  
+
   // Calculate security score if available
   if (securitySummary) {
     const totalDeps = securitySummary.total || dependencies.length;
     if (totalDeps > 0) {
       // Count vulnerabilities by severity
       const vulnerableDeps = dependencies.filter(d => d.security && d.security.vulnerable);
-      
+
       vulnerableDeps.forEach(dep => {
         securityScore += weights.security[dep.security.highestSeverity];
       });
-      
+
       securityScore = (securityScore / totalDeps) * 100;
     }
   }
-  
+
   // Combined score (security is weighted more heavily)
   const hasSecurityData = securitySummary !== null;
-  const combinedScore = hasSecurityData 
-    ? Math.round((driftScore * 0.4) + (securityScore * 0.6)) 
+  const combinedScore = hasSecurityData
+    ? Math.round((driftScore * 0.4) + (securityScore * 0.6))
     : Math.round(driftScore);
-  
+
   // Determine overall status
   let status;
   if (combinedScore < 10) {
@@ -199,25 +199,25 @@ function calculateOverallAssessment(results) {
   } else {
     status = 'critical';
   }
-  
+
   // Critical security vulnerabilities always result in critical status
   if (hasSecurityData && securitySummary.severityCounts.critical > 0) {
     status = 'critical';
   }
-  
+
   return {
     driftScore: Math.round(driftScore),
     securityScore: hasSecurityData ? Math.round(securityScore) : null,
     combinedScore,
     status,
     outdatedDependencies: dependencies.filter(d => d.driftLevel !== 'none').length,
-    vulnerableDependencies: hasSecurityData 
-      ? dependencies.filter(d => d.security && d.security.vulnerable).length 
+    vulnerableDependencies: hasSecurityData
+      ? dependencies.filter(d => d.security && d.security.vulnerable).length
       : null,
     totalDependencies: dependencies.length,
     criticalUpdates: dependencies.filter(d => d.driftLevel === 'critical').length,
-    criticalVulnerabilities: hasSecurityData 
-      ? dependencies.filter(d => d.security && d.security.highestSeverity === 'critical').length 
+    criticalVulnerabilities: hasSecurityData
+      ? dependencies.filter(d => d.security && d.security.highestSeverity === 'critical').length
       : null
   };
 }
@@ -243,22 +243,22 @@ function calculateOverallAssessment(results) {
  * // Example output
  * // [{ type: 'security', priority: 180, dependencyName: 'lodash', ... }]
  */
-function generateRecommendations(assessment, options = {}) {
+function generateRecommendations (assessment, options = {}) {
   const { maxRecommendations = 5 } = options;
   const { dependencies } = assessment;
-  
+
   if (!dependencies || dependencies.length === 0) {
     return [];
   }
-  
+
   // Generate recommendations for each dependency
   const allRecommendations = dependencies.map(dep => {
     const recommendations = [];
-    
+
     // Security vulnerabilities (highest priority)
     if (dep.security && dep.security.vulnerable) {
       const vulnerabilities = dep.security.vulnerabilities || [];
-      
+
       if (vulnerabilities.length > 0) {
         // Use the first vulnerability's recommendation or create a generic one
         const vuln = vulnerabilities[0];
@@ -272,7 +272,7 @@ function generateRecommendations(assessment, options = {}) {
         });
       }
     }
-    
+
     // Version drift (second priority)
     if (dep.driftLevel && dep.driftLevel !== 'none') {
       recommendations.push({
@@ -285,13 +285,13 @@ function generateRecommendations(assessment, options = {}) {
         details: `${dep.driftLevel} drift: ${dep.daysBehind} days behind`
       });
     }
-    
+
     return recommendations;
   }).flat();
-  
+
   // Sort by priority (highest first)
   allRecommendations.sort((a, b) => b.priority - a.priority);
-  
+
   // Return top N recommendations
   return allRecommendations.slice(0, maxRecommendations);
 }
@@ -303,9 +303,9 @@ function generateRecommendations(assessment, options = {}) {
  * @param {string} level - Severity or drift level (critical, high, medium, low, none)
  * @returns {number} Priority score (higher = more important)
  */
-function getPriorityScore(type, level) {
+function getPriorityScore (type, level) {
   const baseScore = type === 'security' ? 100 : 50;
-  
+
   const levelScores = {
     critical: 100,
     high: 80,
@@ -314,7 +314,7 @@ function getPriorityScore(type, level) {
     none: 0,
     unknown: 20
   };
-  
+
   return baseScore + (levelScores[level] || 0);
 }
 
@@ -345,9 +345,9 @@ function getPriorityScore(type, level) {
  *   '/path/to/project2/package.json'
  * ]);
  */
-async function batchAssessDependencies(projectPaths, options = {}) {
+async function batchAssessDependencies (projectPaths, options = {}) {
   const results = [];
-  
+
   for (const path of projectPaths) {
     try {
       const result = await assessDependencies(path, options);
@@ -361,7 +361,7 @@ async function batchAssessDependencies(projectPaths, options = {}) {
       });
     }
   }
-  
+
   return results;
 }
 
@@ -369,4 +369,4 @@ module.exports = {
   assessDependencies,
   generateRecommendations,
   batchAssessDependencies
-}; 
+};
