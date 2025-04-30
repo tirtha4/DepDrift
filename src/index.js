@@ -1,8 +1,8 @@
 /**
  * DepDrift Main Entry Point
- * 
+ *
  * This file exports the main functionality of DepDrift for programmatic use.
- * 
+ *
  * @module depdrift
  */
 
@@ -26,16 +26,16 @@ module.exports = {
   // Core assessment functions
   assessDependencies,
   generateRecommendations,
-  
+
   // Individual analyzers
   analyzePackage,
   analyzeSecurity,
-  
+
   // Utility functions
   flattenTree,
   classifyVersionDifference,
   summarizeDriftLevels,
-  
+
   // Version information
   version: require('../package.json').version
 };
