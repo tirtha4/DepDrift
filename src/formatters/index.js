@@ -1,18 +1,18 @@
 /**
  * DepDrift Formatters Module
- * 
+ *
  * This module exports the output formatters for the DepDrift analysis results.
- * 
+ *
  * @module formatters
  */
 
 'use strict';
 
 // Import formatters
-const { 
-  formatAnalysisText, 
-  formatAnalysisJson, 
-  formatAnalysisCSV 
+const {
+  formatAnalysisText,
+  formatAnalysisJson,
+  formatAnalysisCSV
 } = require('../utils/formatters');
 const tableFormatter = require('./tableFormatter');
 const textFormatter = require('./textFormatter');
@@ -25,7 +25,7 @@ const reporter = require('./reporter');
  * @param {Object} options - Formatting options
  * @returns {string} Formatted table
  */
-function formatTable(results, options = {}) {
+function formatTable (results, options = {}) {
   return tableFormatter.formatAnalysisAsTables(results, options);
 }
 
@@ -35,7 +35,7 @@ function formatTable(results, options = {}) {
  * @param {Object} options - Formatting options
  * @returns {string} Formatted HTML
  */
-function formatHtml(results, options = {}) {
+function formatHtml (results, options = {}) {
   return generateHtmlReport(results, options);
 }
 
@@ -45,7 +45,7 @@ function formatHtml(results, options = {}) {
  * @param {Object} options - Formatting and reporting options
  * @returns {Promise<string>} The formatted output
  */
-async function report(results, options = {}) {
+async function report (results, options = {}) {
   return reporter.reportAnalysis(results, options);
 }
 
@@ -57,25 +57,25 @@ module.exports = {
   formatCsv: formatAnalysisCSV,
   formatTable,
   formatHtml,
-  
+
   // Reporting functions
   report,
   saveReport: reporter.saveReport,
   generateSummary: reporter.generateSummary,
-  
+
   // File output functions
   saveHtmlReport,
-  
+
   // For backward compatibility
   formatAnalysisText,
   formatAnalysisJson,
   formatAnalysisCSV,
   generateHtmlReport,
-  
+
   // Reporter exports
   reporter,
-  
+
   // Export original formatters for compatibility
   ...tableFormatter,
   ...textFormatter
-}; 
+};

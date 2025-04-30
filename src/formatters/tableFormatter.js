@@ -11,7 +11,7 @@ const { formatDriftLevel, formatSecuritySeverity } = require('../utils/formatter
  * Get terminal width
  * @returns {number} Width of terminal in columns
  */
-function getTerminalWidth() {
+function getTerminalWidth () {
   return process.stdout.columns || 80;
 }
 
@@ -20,11 +20,11 @@ function getTerminalWidth() {
  * @param {Date} date - Date to format
  * @returns {string} Formatted time ago string
  */
-function formatTimeAgo(date) {
+function formatTimeAgo (date) {
   const now = new Date();
   const diffMs = now - date;
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays === 0) {
     return 'Today';
   } else if (diffDays === 1) {
@@ -42,7 +42,7 @@ function formatTimeAgo(date) {
 
 /**
  * Create a colored table of dependencies with drift and security information
- * @param {Object} analysis - The analysis results 
+ * @param {Object} analysis - The analysis results
  * @param {Object} options - Table formatting options
  * @param {boolean} [options.compact=false] - Whether to use a compact view
  * @param {boolean} [options.includeSecurity=true] - Whether to include security columns
@@ -52,8 +52,8 @@ function formatTimeAgo(date) {
  * @param {boolean} [options.showAll=false] - Whether to show all dependencies or only issues
  * @returns {string} Table output as string
  */
-function createDependencyTable(analysis, options = {}) {
-  const { 
+function createDependencyTable (analysis, options = {}) {
+  const {
     compact = false,
     includeSecurity = true,
     sortBy = 'drift',
@@ -61,28 +61,28 @@ function createDependencyTable(analysis, options = {}) {
     useImprovedFormat = true,
     showAll = false
   } = options;
-  
+
   // Define table columns based on options
   const columns = useImprovedFormat
     ? ['Package', 'Current', 'Latest', 'Update Status', 'Last Updated', 'Drift']
-    : compact 
+    : compact
       ? ['Package', 'Current', 'Latest', 'Drift']
       : ['Package', 'Current', 'Latest', 'Days Behind', 'Drift'];
-  
+
   // Add security columns if requested
   if (includeSecurity) {
     columns.push('Security');
   }
-  
+
   // Calculate available terminal width
   const terminalWidth = getTerminalWidth();
-  
+
   // Calculate column widths proportionally based on typical content size and terminal width
   const tableWidth = terminalWidth - 5; // Allow some padding
-  
+
   // Define column width ratios
   let colWidths;
-  
+
   if (useImprovedFormat) {
     // Package, Current, Latest, Update Status, Last Updated, Drift, [Security]
     if (includeSecurity) {
@@ -105,7 +105,7 @@ function createDependencyTable(analysis, options = {}) {
       colWidths = calculateColumnWidths(tableWidth, [3, 1.5, 1.5, 2, 1.5]);
     }
   }
-  
+
   // Create table instance with border styling and column widths
   const table = new Table({
     head: columns.map(col => chalk.cyan.bold(col)),
@@ -119,61 +119,61 @@ function createDependencyTable(analysis, options = {}) {
     },
     style: {
       head: [], // No additional styling for header
-      border: [], // No additional styling for border
+      border: [] // No additional styling for border
     }
   });
-  
+
   // Sort dependencies
   const sortedDeps = [...analysis.dependencies];
-  
+
   switch (sortBy) {
-    case 'drift':
-      // Sort by drift level (critical first)
-      const driftOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4, unknown: 5 };
-      sortedDeps.sort((a, b) => {
-        const orderA = driftOrder[a.driftLevel] || 5;
-        const orderB = driftOrder[b.driftLevel] || 5;
-        return orderA - orderB || a.name.localeCompare(b.name);
-      });
-      break;
-    case 'security':
-      // Sort by security severity (critical first)
-      const securityOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
-      sortedDeps.sort((a, b) => {
-        const secA = a.security || { highestSeverity: 'none' };
-        const secB = b.security || { highestSeverity: 'none' };
-        const orderA = securityOrder[secA.highestSeverity] || 4;
-        const orderB = securityOrder[secB.highestSeverity] || 4;
-        return orderA - orderB || a.name.localeCompare(b.name);
-      });
-      break;
-    case 'days':
-      // Sort by days behind (most days first)
-      sortedDeps.sort((a, b) => {
-        const daysA = a.daysBehind || 0;
-        const daysB = b.daysBehind || 0;
-        return daysB - daysA || a.name.localeCompare(b.name);
-      });
-      break;
-    case 'name':
-    default:
-      // Sort by name
-      sortedDeps.sort((a, b) => a.name.localeCompare(b.name));
+  case 'drift':
+    // Sort by drift level (critical first)
+    const driftOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4, unknown: 5 };
+    sortedDeps.sort((a, b) => {
+      const orderA = driftOrder[a.driftLevel] || 5;
+      const orderB = driftOrder[b.driftLevel] || 5;
+      return orderA - orderB || a.name.localeCompare(b.name);
+    });
+    break;
+  case 'security':
+    // Sort by security severity (critical first)
+    const securityOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
+    sortedDeps.sort((a, b) => {
+      const secA = a.security || { highestSeverity: 'none' };
+      const secB = b.security || { highestSeverity: 'none' };
+      const orderA = securityOrder[secA.highestSeverity] || 4;
+      const orderB = securityOrder[secB.highestSeverity] || 4;
+      return orderA - orderB || a.name.localeCompare(b.name);
+    });
+    break;
+  case 'days':
+    // Sort by days behind (most days first)
+    sortedDeps.sort((a, b) => {
+      const daysA = a.daysBehind || 0;
+      const daysB = b.daysBehind || 0;
+      return daysB - daysA || a.name.localeCompare(b.name);
+    });
+    break;
+  case 'name':
+  default:
+    // Sort by name
+    sortedDeps.sort((a, b) => a.name.localeCompare(b.name));
   }
-  
+
   // Apply sort direction if 'asc' is specified (default is already 'desc')
   if (sortDirection === 'asc') {
     sortedDeps.reverse();
   }
-  
+
   // Filter dependencies if not showing all
-  const depsToShow = showAll 
+  const depsToShow = showAll
     ? sortedDeps
-    : sortedDeps.filter(dep => 
-        dep.driftLevel && dep.driftLevel !== 'none' || 
+    : sortedDeps.filter(dep =>
+      dep.driftLevel && dep.driftLevel !== 'none' ||
         (dep.security && dep.security.vulnerable)
-      );
-  
+    );
+
   // If no dependencies to show after filtering
   if (depsToShow.length === 0) {
     if (!showAll) {
@@ -181,33 +181,33 @@ function createDependencyTable(analysis, options = {}) {
     }
     return 'No dependencies found.';
   }
-  
+
   // Add rows to table
   depsToShow.forEach(dep => {
     const row = [];
-    
+
     // Package name column (with dev indicator if needed)
-    let nameDisplay = dep.isDevDependency 
-      ? `${dep.name} ${chalk.cyan('[dev]')}` 
-      : dep.isPeerDependency 
-        ? `${dep.name} ${chalk.magenta('[peer]')}` 
-        : dep.isOptionalDependency 
-          ? `${dep.name} ${chalk.yellow('[optional]')}` 
+    let nameDisplay = dep.isDevDependency
+      ? `${dep.name} ${chalk.cyan('[dev]')}`
+      : dep.isPeerDependency
+        ? `${dep.name} ${chalk.magenta('[peer]')}`
+        : dep.isOptionalDependency
+          ? `${dep.name} ${chalk.yellow('[optional]')}`
           : dep.name;
-    
+
     // Highlight package name if it has vulnerabilities
     if (dep.security && dep.security.vulnerable) {
       nameDisplay = chalk.bold.red(nameDisplay);
     }
-    
+
     row.push(nameDisplay);
-    
+
     // Current version column
     row.push(getColoredVersion(dep.currentVersion, dep.driftLevel));
-    
+
     // Latest version column
     row.push(chalk.cyan(dep.latestVersion || 'unknown'));
-    
+
     if (useImprovedFormat) {
       // Update Status column - clearly indicates if update is needed
       if (dep.currentVersion !== dep.latestVersion) {
@@ -215,41 +215,41 @@ function createDependencyTable(analysis, options = {}) {
       } else {
         row.push(chalk.green('Up to date'));
       }
-      
+
       // Last Updated column
-      const lastUpdated = dep.latestPublishDate ? 
-        formatTimeAgo(new Date(dep.latestPublishDate)) : 
+      const lastUpdated = dep.latestPublishDate ?
+        formatTimeAgo(new Date(dep.latestPublishDate)) :
         formatTimeAgo(new Date(Date.now() - (dep.daysBehind * 24 * 60 * 60 * 1000)));
       row.push(getDaysBehindDisplay(lastUpdated, dep.daysBehind));
     } else if (!compact) {
       // Traditional Days behind column (if not compact mode)
       row.push(getDaysBehindDisplay(dep.daysBehind));
     }
-    
+
     // Drift level column
     row.push(formatDriftLevel(dep.driftLevel));
-    
+
     // Security column (if requested)
     if (includeSecurity) {
       const security = dep.security || { vulnerable: false, highestSeverity: 'none', vulnerabilities: [] };
-      
+
       if (security.vulnerable) {
         // Create enhanced security display with vulnerability count
         const vulnCount = security.vulnerabilities?.length || 0;
         const securityColor = getSecurityColor(security.highestSeverity);
         const vulnCountText = vulnCount > 0 ? ` (${vulnCount})` : '';
         const securityDisplay = `${securityColor(security.highestSeverity.toUpperCase())}${chalk.bold.red(vulnCountText)}`;
-        
+
         row.push(securityDisplay);
       } else {
         // Standard "none" for non-vulnerable packages
         row.push(chalk.green('none'));
       }
     }
-    
+
     table.push(row);
   });
-  
+
   return table.toString();
 }
 
@@ -259,10 +259,10 @@ function createDependencyTable(analysis, options = {}) {
  * @param {Array<number>} ratios - Weight ratios for each column
  * @returns {Array<number>} Column widths
  */
-function calculateColumnWidths(totalWidth, ratios) {
+function calculateColumnWidths (totalWidth, ratios) {
   // Calculate total ratio
   const totalRatio = ratios.reduce((sum, ratio) => sum + ratio, 0);
-  
+
   // Calculate column widths based on ratios, ensuring minimum width
   const columnWidths = ratios.map(ratio => {
     // Allocate percentage of available width based on ratio
@@ -270,13 +270,13 @@ function calculateColumnWidths(totalWidth, ratios) {
     // Ensure minimum width of 3 characters
     return Math.max(width, 3);
   });
-  
+
   // Adjust last column to account for any rounding errors
   const allocatedWidth = columnWidths.reduce((sum, width) => sum + width, 0);
   if (allocatedWidth < totalWidth) {
     columnWidths[columnWidths.length - 1] += (totalWidth - allocatedWidth);
   }
-  
+
   return columnWidths;
 }
 
@@ -285,9 +285,9 @@ function calculateColumnWidths(totalWidth, ratios) {
  * @param {Object} analysis - The analysis results
  * @returns {string} Summary table as string
  */
-function createSummaryTable(analysis) {
+function createSummaryTable (analysis) {
   const terminalWidth = getTerminalWidth();
-  
+
   const table = new Table({
     colWidths: [
       Math.floor(terminalWidth * 0.4),
@@ -302,34 +302,34 @@ function createSummaryTable(analysis) {
     },
     style: {
       head: [], // No additional styling for header
-      border: [], // No additional styling for border
+      border: [] // No additional styling for border
     }
   });
-  
+
   if (!analysis.overallAssessment) {
     return 'No assessment data available';
   }
-  
+
   const { overallAssessment } = analysis;
-  
+
   // Get status display with color
   const getStatusDisplay = status => {
     switch (status) {
-      case 'excellent': return chalk.green.bold('Excellent');
-      case 'good': return chalk.blue.bold('Good');
-      case 'fair': return chalk.yellow.bold('Fair');
-      case 'poor': return chalk.red.bold('Poor');
-      case 'critical': return chalk.bgRed.white.bold('Critical');
-      default: return status;
+    case 'excellent': return chalk.green.bold('Excellent');
+    case 'good': return chalk.blue.bold('Good');
+    case 'fair': return chalk.yellow.bold('Fair');
+    case 'poor': return chalk.red.bold('Poor');
+    case 'critical': return chalk.bgRed.white.bold('Critical');
+    default: return status;
     }
   };
-  
+
   // Get score display with color
   const getScoreDisplay = score => {
     if (score === null || score === undefined) {
       return chalk.gray('N/A');
     }
-    
+
     if (score < 10) {
       return chalk.green(score);
     } else if (score < 30) {
@@ -342,7 +342,7 @@ function createSummaryTable(analysis) {
       return chalk.bgRed.white(score);
     }
   };
-  
+
   // Add rows to table
   table.push(
     [chalk.cyan.bold('Status'), getStatusDisplay(overallAssessment.status)],
@@ -352,7 +352,7 @@ function createSummaryTable(analysis) {
     [chalk.cyan.bold('Outdated Dependencies'), `${overallAssessment.outdatedDependencies} of ${analysis.dependencies.length}`],
     [chalk.cyan.bold('Vulnerable Dependencies'), `${overallAssessment.vulnerableDependencies || 0} of ${analysis.dependencies.length}`]
   );
-  
+
   return table.toString();
 }
 
@@ -361,12 +361,12 @@ function createSummaryTable(analysis) {
  * @param {Array<Object>} recommendations - Recommendations from analysis
  * @returns {string} Recommendations table as string
  */
-function createRecommendationsTable(recommendations) {
+function createRecommendationsTable (recommendations) {
   // Handle missing or invalid recommendations
   if (!recommendations || !Array.isArray(recommendations) || recommendations.length === 0) {
     return 'No specific recommendations available.';
   }
-  
+
   // Create table with columns
   const table = new Table({
     head: [
@@ -385,30 +385,30 @@ function createRecommendationsTable(recommendations) {
     },
     style: {
       head: [], // No additional styling for header
-      border: [], // No additional styling for border
+      border: [] // No additional styling for border
     }
   });
-  
+
   // Convert recommendations to standard format if they're not already
   const standardizedRecs = recommendations.map(rec => {
     // If it's already in the expected format
     if (rec.dependencyName && rec.currentVersion && rec.recommendation && rec.details) {
       return rec;
     }
-    
+
     // Convert from alternative format
     return {
       dependencyName: rec.package || rec.name || 'Unknown package',
       currentVersion: rec.currentVersion || rec.version || 'unknown',
-      recommendation: rec.recommendation || 
+      recommendation: rec.recommendation ||
                      (rec.targetVersion ? `Update to ${rec.targetVersion}` : 'Update recommended'),
-      details: rec.details || 
-              (rec.reason ? `${rec.reason} (${rec.priority || 'medium'} priority)` : 
-                          'Dependency needs attention'),
+      details: rec.details ||
+              (rec.reason ? `${rec.reason} (${rec.priority || 'medium'} priority)` :
+                'Dependency needs attention'),
       hasSecurity: rec.hasSecurity || rec.security || false
     };
   });
-  
+
   // Add rows to the table
   standardizedRecs.forEach((rec, index) => {
     // Update terminology in details to be more accurate
@@ -422,23 +422,23 @@ function createRecommendationsTable(recommendations) {
         if (lowerMatch === 'low') return chalk.blue(match);
         return match;
       });
-    
+
     // Add security indicator if this recommendation is based on security
     if (rec.hasSecurity || (rec.details && rec.details.toLowerCase().includes('security'))) {
       detailsDisplay = `${chalk.bgRed.white(' SECURITY ')} ${detailsDisplay}`;
     }
-    
+
     // Format the package name to highlight security issues
-    let packageDisplay = rec.hasSecurity ? 
-      chalk.bold.red(rec.dependencyName) : 
+    const packageDisplay = rec.hasSecurity ?
+      chalk.bold.red(rec.dependencyName) :
       chalk.bold(rec.dependencyName);
-    
+
     // Add recommendation with package version
     let recommendationDisplay = rec.recommendation;
     if (rec.targetVersion && !rec.recommendation.includes(rec.targetVersion)) {
       recommendationDisplay = `Update to ${chalk.green(rec.targetVersion)}`;
     }
-    
+
     table.push([
       chalk.white.bold(index + 1),
       packageDisplay,
@@ -447,7 +447,7 @@ function createRecommendationsTable(recommendations) {
       detailsDisplay
     ]);
   });
-  
+
   return table.toString();
 }
 
@@ -455,7 +455,7 @@ function createRecommendationsTable(recommendations) {
  * Create an explanation block to help users understand the improved table
  * @returns {string} Explanation text
  */
-function createExplanationBlock() {
+function createExplanationBlock () {
   return `
 ${chalk.cyan.bold('📋 Understanding the Table:')}
   • ${chalk.cyan.bold('Package:')} Dependency name and type
@@ -483,20 +483,20 @@ ${chalk.cyan.bold('📋 Understanding the Table:')}
  * @param {boolean} [options.showAll=false] - Whether to show all dependencies or only outdated ones
  * @returns {string} Formatted tables as string
  */
-function formatAnalysisAsTables(analysis, options = {}) {
-  const { 
-    includeSecurity = true, 
+function formatAnalysisAsTables (analysis, options = {}) {
+  const {
+    includeSecurity = true,
     sortBy = 'drift',
     sortDirection = 'desc',
     useImprovedFormat = true,
     showAll = false
   } = options;
-  
+
   // Handle missing analysis
   if (!analysis) {
     return 'No analysis results available.';
   }
-  
+
   // Generate header info
   const header = `
 ${chalk.bold.blue('DepDrift Analysis Results')}
@@ -504,28 +504,28 @@ ${chalk.cyan('Project:')} ${chalk.white(analysis.projectName)}@${chalk.white(ana
 ${chalk.cyan('Path:')} ${chalk.white(analysis.packageJsonPath)}
 ${chalk.cyan('Analyzed on:')} ${chalk.white(new Date(analysis.timestamp).toLocaleString())}
 `;
-  
+
   // Generate summary table
   const summaryTable = createSummaryTable(analysis);
-  
+
   // Generate dependencies table with showAll option
-  const dependenciesTable = createDependencyTable(analysis, { 
-    includeSecurity, 
+  const dependenciesTable = createDependencyTable(analysis, {
+    includeSecurity,
     sortBy,
     sortDirection,
     useImprovedFormat,
     compact: options.compact || false,
     showAll
   });
-  
+
   // Generate recommendations table if recommendations exist
-  const recommendationsTable = analysis.recommendations ? 
-    createRecommendationsTable(analysis.recommendations) : 
+  const recommendationsTable = analysis.recommendations ?
+    createRecommendationsTable(analysis.recommendations) :
     'No recommendations available.';
-  
+
   // Add explanation block if using improved format
   const explanation = useImprovedFormat ? createExplanationBlock() : '';
-  
+
   // Combine all sections
   return `${header}
 ${chalk.bold.blue('Overall Assessment')}
@@ -546,20 +546,20 @@ ${recommendationsTable}
  * @param {string} driftLevel - Drift level
  * @returns {string} Colored version string
  */
-function getColoredVersion(version, driftLevel) {
+function getColoredVersion (version, driftLevel) {
   switch (driftLevel) {
-    case 'none':
-      return chalk.green(version);
-    case 'low':
-      return chalk.blue(version);
-    case 'medium':
-      return chalk.yellow(version);
-    case 'high':
-      return chalk.red(version);
-    case 'critical':
-      return chalk.bgRed.white(version);
-    default:
-      return version;
+  case 'none':
+    return chalk.green(version);
+  case 'low':
+    return chalk.blue(version);
+  case 'medium':
+    return chalk.yellow(version);
+  case 'high':
+    return chalk.red(version);
+  case 'critical':
+    return chalk.bgRed.white(version);
+  default:
+    return version;
   }
 }
 
@@ -570,13 +570,13 @@ function getColoredVersion(version, driftLevel) {
  * @param {number} [days] - Days behind (only needed if first param is string)
  * @returns {string} Colored days behind string
  */
-function getDaysBehindDisplay(value, days) {
+function getDaysBehindDisplay (value, days) {
   // If value is a number, it's the traditional days behind
   if (typeof value === 'number') {
     if (!value || value <= 0) {
       return chalk.green('0 days');
     }
-    
+
     if (value <= 30) {
       return chalk.blue(`${value} days`);
     } else if (value <= 90) {
@@ -587,7 +587,7 @@ function getDaysBehindDisplay(value, days) {
       return chalk.bgRed.white(`${value} days`);
     }
   }
-  
+
   // If value is a string, it's the formatted date string
   if (!days || days <= 30) {
     return chalk.green(value);
@@ -608,13 +608,13 @@ function getDaysBehindDisplay(value, days) {
  * @param {string} severity - Security severity level
  * @returns {Function} Chalk color function
  */
-function getSecurityColor(severity) {
+function getSecurityColor (severity) {
   switch (severity) {
-    case 'critical': return chalk.bgRed.white;
-    case 'high': return chalk.bold.red;
-    case 'medium': return chalk.bold.yellow;
-    case 'low': return chalk.blue;
-    default: return chalk.green;
+  case 'critical': return chalk.bgRed.white;
+  case 'high': return chalk.bold.red;
+  case 'medium': return chalk.bold.yellow;
+  case 'low': return chalk.blue;
+  default: return chalk.green;
   }
 }
 
@@ -625,4 +625,4 @@ module.exports = {
   formatAnalysisAsTables,
   createExplanationBlock,
   formatTimeAgo
-}; 
+};
