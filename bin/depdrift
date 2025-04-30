@@ -6,7 +6,18 @@
  * This is the main entry point for the DepDrift command line interface.
  */
 
-'use strict';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+import yargs from 'yargs/yargs';
+import { hideBin } from 'yargs/helpers';
+import { assessDependencies, generateRecommendations } from '../src/core/assessor.js';
+import fs from 'fs-extra';
+import chalk from 'chalk';
+import { createRequire } from 'module';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const require = createRequire(import.meta.url);
 
 process.title = 'depdrift';
 
@@ -16,13 +27,6 @@ if (process.argv.includes('help')) {
   require('./depdrift-help');
   process.exit(0);
 }
-
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
-const { assessDependencies, generateRecommendations } = require('../src/core/assessor');
-const fs = require('fs-extra');
-const path = require('path');
-const chalk = require('chalk');
 
 async function main(argv) {
   try {
@@ -43,7 +47,7 @@ async function main(argv) {
     
     if (!packageJsonPath) {
       // Try to find package.json in current directory
-      packageJsonPath = path.resolve(process.cwd(), 'package.json');
+      packageJsonPath = resolve(process.cwd(), 'package.json');
       
       if (!fs.existsSync(packageJsonPath)) {
         console.error('Error: Could not find package.json in current directory');
