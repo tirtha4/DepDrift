@@ -12,32 +12,32 @@ const Table = require('cli-table3');
  * @param {string} status - Drift status
  * @returns {Function} Chalk color function
  */
-function getStatusColor(status) {
+function getStatusColor (status) {
   switch (status.toLowerCase()) {
-    case 'missing':
-    case 'major':
-    case 'extra':
-    case 'critical':
-    case 'high':
-    case 'peer-missing':
-      return chalk.red;
-    
-    case 'minor':
-    case 'medium':
-      return chalk.yellow;
-    
-    case 'patch':
-    case 'low':
-      return chalk.cyan;
-    
-    case 'safe':
-    case 'none':
-    case 'optional-missing':
-      return chalk.green;
-    
-    case 'unknown':
-    default:
-      return chalk.gray;
+  case 'missing':
+  case 'major':
+  case 'extra':
+  case 'critical':
+  case 'high':
+  case 'peer-missing':
+    return chalk.red;
+
+  case 'minor':
+  case 'medium':
+    return chalk.yellow;
+
+  case 'patch':
+  case 'low':
+    return chalk.cyan;
+
+  case 'safe':
+  case 'none':
+  case 'optional-missing':
+    return chalk.green;
+
+  case 'unknown':
+  default:
+    return chalk.gray;
   }
 }
 
@@ -47,7 +47,7 @@ function getStatusColor(status) {
  * @param {Object} options - Report options
  * @returns {Promise<void>}
  */
-async function reportDrift(records, options = {}) {
+async function reportDrift (records, options = {}) {
   const {
     json = false,
     jsonFile = 'drift-report.json',
@@ -56,23 +56,23 @@ async function reportDrift(records, options = {}) {
     sortDirection = 'desc',
     title = 'Dependency Drift Report'
   } = options;
-  
+
   if (!records || !Array.isArray(records) || records.length === 0) {
     console.log(chalk.yellow('No dependency drift records to report.'));
-    
+
     if (json) {
       await fs.writeJson(jsonFile, { records: [] }, { spaces: 2 });
       console.log(chalk.gray(`Empty report written to ${jsonFile}`));
     }
-    
+
     return;
   }
-  
+
   // Sort the records
   const sortedRecords = [...records].sort((a, b) => {
     const statusRank = {
       'missing': 50,
-      'peer-missing': 45, 
+      'peer-missing': 45,
       'extra': 40,
       'critical': 30,
       'high': 25,
@@ -86,37 +86,37 @@ async function reportDrift(records, options = {}) {
       'none': 0,
       'unknown': -1
     };
-    
+
     let comparison = 0;
-    
+
     switch (sortBy) {
-      case 'status':
-        // Get status rank or default to -1 if not found
-        const aRank = statusRank[a.status?.toLowerCase()] ?? -1;
-        const bRank = statusRank[b.status?.toLowerCase()] ?? -1;
-        comparison = bRank - aRank;
-        break;
-        
-      case 'name':
-      case 'package':
-        comparison = a.package?.localeCompare(b.package) ?? 0;
-        break;
-        
-      case 'expected':
-        comparison = a.expected?.localeCompare(b.expected) ?? 0;
-        break;
-        
-      case 'installed':
-        comparison = a.installed?.localeCompare(b.installed) ?? 0;
-        break;
-        
-      default:
-        comparison = 0;
+    case 'status':
+      // Get status rank or default to -1 if not found
+      const aRank = statusRank[a.status?.toLowerCase()] ?? -1;
+      const bRank = statusRank[b.status?.toLowerCase()] ?? -1;
+      comparison = bRank - aRank;
+      break;
+
+    case 'name':
+    case 'package':
+      comparison = a.package?.localeCompare(b.package) ?? 0;
+      break;
+
+    case 'expected':
+      comparison = a.expected?.localeCompare(b.expected) ?? 0;
+      break;
+
+    case 'installed':
+      comparison = a.installed?.localeCompare(b.installed) ?? 0;
+      break;
+
+    default:
+      comparison = 0;
     }
-    
+
     return sortDirection === 'asc' ? -comparison : comparison;
   });
-  
+
   // Create table
   const table = new Table({
     head: [
@@ -129,19 +129,19 @@ async function reportDrift(records, options = {}) {
       head: []
     }
   });
-  
+
   // Filter records if not showing all
-  const recordsToShow = showAll 
-    ? sortedRecords 
-    : sortedRecords.filter(r => 
-        r.status && 
+  const recordsToShow = showAll
+    ? sortedRecords
+    : sortedRecords.filter(r =>
+      r.status &&
         !['safe', 'none', 'optional-missing'].includes(r.status.toLowerCase())
-      );
-  
+    );
+
   // Add rows
   recordsToShow.forEach(record => {
     const colorFn = getStatusColor(record.status || 'unknown');
-    
+
     table.push([
       record.package || '-',
       record.expected || '-',
@@ -149,13 +149,13 @@ async function reportDrift(records, options = {}) {
       colorFn(record.status || 'unknown')
     ]);
   });
-  
+
   // Print title and table
   console.log(chalk.bold.underline(`\n${title}`));
   console.log(`Total dependencies: ${records.length}`);
   console.log(`Issues found: ${recordsToShow.length}\n`);
   console.log(table.toString());
-  
+
   // Write JSON file if requested
   if (json) {
     await fs.writeJson(jsonFile, { records: sortedRecords }, { spaces: 2 });
@@ -168,7 +168,7 @@ async function reportDrift(records, options = {}) {
  * @param {Array} records - Array of dependency records
  * @returns {Object} Summary object
  */
-function generateDriftSummary(records) {
+function generateDriftSummary (records) {
   if (!records || !Array.isArray(records) || records.length === 0) {
     return {
       total: 0,
@@ -176,26 +176,26 @@ function generateDriftSummary(records) {
       statusCounts: {}
     };
   }
-  
+
   const summary = {
     total: records.length,
     issues: 0,
     statusCounts: {}
   };
-  
+
   // Count by status
   records.forEach(record => {
     const status = (record.status || 'unknown').toLowerCase();
-    
+
     // Increment status count
     summary.statusCounts[status] = (summary.statusCounts[status] || 0) + 1;
-    
+
     // Count as issue if not safe/none/optional-missing
     if (!['safe', 'none', 'optional-missing'].includes(status)) {
       summary.issues++;
     }
   });
-  
+
   return summary;
 }
 
@@ -206,9 +206,9 @@ function generateDriftSummary(records) {
  * @param {Object} options - Report options
  * @returns {Promise<void>}
  */
-async function saveDriftReport(records, filePath, options = {}) {
+async function saveDriftReport (records, filePath, options = {}) {
   const { format = 'json' } = options;
-  
+
   try {
     if (format === 'json') {
       await fs.writeJson(filePath, { records }, { spaces: 2 });
@@ -226,4 +226,4 @@ module.exports = {
   generateDriftSummary,
   saveDriftReport,
   getStatusColor
-}; 
+};
