@@ -1,0 +1,158 @@
+#!/usr/bin/env node
+
+/**
+ * Wrapper for depdrift with improved table format
+ * Features:
+ * - Clearer column names distinguishing "Update Status" and "Last Updated"
+ * - Terminal width awareness that adjusts table width automatically
+ * - Detailed explanation of what each column means
+ */
+
+const path = require('path');
+const fs = require('fs-extra');
+const chalk = require('chalk');
+const { assessDependencies, generateRecommendations } = require('../src/dependencyAssessor');
+const { formatAnalysisAsTables } = require('../src/formatters/tableFormatter');
+const yargs = require('yargs/yargs');
+const { hideBin } = require('yargs/helpers');
+
+// Set chalk level to force colorization
+chalk.level = 2;
+
+// Set up CLI arguments
+const argv = yargs(hideBin(process.argv))
+  .usage('Usage: $0 [options]')
+  .option('path', {
+    alias: 'p',
+    describe: 'Path to package.json file or project directory',
+    type: 'string'
+  })
+  .option('output', {
+    alias: 'o',
+    describe: 'Output file path',
+    type: 'string'
+  })
+  .option('sort-by', {
+    alias: 's',
+    describe: 'Sort dependencies by field',
+    choices: ['name', 'drift', 'days', 'security'],
+    default: 'drift'
+  })
+  .option('no-security', {
+    describe: 'Skip security vulnerability checks',
+    type: 'boolean',
+    default: false
+  })
+  .option('max-recommendations', {
+    alias: 'r',
+    describe: 'Maximum number of recommendations to show',
+    type: 'number',
+    default: 5
+  })
+  .option('exclude-types', {
+    alias: 'e',
+    describe: 'Exclude dependency types (comma-separated): dev,peer,optional',
+    type: 'string'
+  })
+  .option('cache', {
+    alias: 'c',
+    describe: 'Use cache for npm registry requests',
+    type: 'boolean',
+    default: true
+  })
+  .help()
+  .alias('help', 'h')
+  .argv;
+
+/**
+ * Parse exclude types string into an object
+ * @param {string} excludeTypes - Comma-separated list of types to exclude
+ * @returns {Object} Object with exclude flags
+ */
+function parseExcludeTypes(excludeTypes) {
+  if (!excludeTypes) {
+    return { excludeDev: false, excludePeer: false, excludeOptional: false };
+  }
+  
+  const types = excludeTypes.toLowerCase().split(',');
+  return {
+    excludeDev: types.includes('dev'),
+    excludePeer: types.includes('peer'),
+    excludeOptional: types.includes('optional')
+  };
+}
+
+/**
+ * Main function
+ */
+async function main() {
+  try {
+    // Process paths
+    let packageJsonPath = argv.path;
+    
+    if (!packageJsonPath) {
+      // Try to find package.json in current directory
+      packageJsonPath = 'package.json';
+      
+      if (!fs.existsSync(packageJsonPath)) {
+        console.error('Error: Could not find package.json in current directory');
+        process.exit(1);
+      }
+    } else {
+      // Check if the path is a directory or file
+      if (fs.statSync(packageJsonPath).isDirectory()) {
+        packageJsonPath = path.join(packageJsonPath, 'package.json');
+        
+        if (!fs.existsSync(packageJsonPath)) {
+          console.error(`Error: Could not find package.json in ${argv.path}`);
+          process.exit(1);
+        }
+      } else if (!packageJsonPath.endsWith('package.json')) {
+        console.error('Error: Specified path does not point to a package.json file');
+        process.exit(1);
+      }
+    }
+    
+    // Set up analysis options
+    const { excludeDev, excludePeer, excludeOptional } = parseExcludeTypes(argv.excludeTypes);
+    
+    const options = {
+      includeDevDependencies: !excludeDev,
+      includePeerDependencies: !excludePeer,
+      includeOptionalDependencies: !excludeOptional,
+      checkSecurity: !argv.noSecurity,
+      securitySources: ['NPM_AUDIT'],
+      useCache: argv.cache,
+      maxConcurrent: 5
+    };
+    
+    // Run the analysis
+    const results = await assessDependencies(packageJsonPath, options);
+    
+    // Generate recommendations
+    const recommendations = generateRecommendations(results, {
+      maxRecommendations: argv.maxRecommendations
+    });
+    
+    // Format with improved table
+    const output = formatAnalysisAsTables(results, recommendations, {
+      includeSecurity: !argv.noSecurity,
+      sortBy: argv.sortBy,
+      useImprovedFormat: true
+    });
+    
+    // Output results
+    if (argv.output) {
+      fs.writeFileSync(argv.output, output);
+      console.log(`Analysis results written to ${argv.output}`);
+    } else {
+      console.log(output);
+    }
+    
+  } catch (error) {
+    console.error('Error:', error.message);
+    process.exit(1);
+  }
+}
+
+main(); 

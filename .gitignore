@@ -1,0 +1,55 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Build output
+dist/
+build/
+
+# Coverage directory used by tools like istanbul
+coverage/
+.nyc_output/
+
+# Analysis results and reports
+analysis-results/
+table-reports/
+drift-reports/
+reports/
+*.report.*
+
+# Output of 'npm pack'
+*.tgz
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Cache directories
+.cache/
+.npm/
+.eslintcache
+
+# Environment variables
+.env
+.env.test
+.env.local
+.env.*.local
+
+# IDE and editor directories
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Project specific
+Test Repo/
+Pr
+docs/*
+test/*
+CoreArchitecture.md
+examples/*

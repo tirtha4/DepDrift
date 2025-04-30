@@ -1,0 +1,63 @@
+{
+  "name": "depdrift",
+  "version": "0.1.0",
+  "description": "A tool to analyze dependency drift in JavaScript projects",
+  "main": "src/index.js",
+  "bin": {
+    "depdrift": "bin/depdrift"
+  },
+  "scripts": {
+    "start": "node bin/depdrift",
+    "test": "jest --coverage",
+    "self-analyze": "node bin/depdrift",
+    "lint": "eslint src",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": [
+    "dependencies",
+    "drift",
+    "npm",
+    "analysis",
+    "outdated",
+    "security",
+    "vulnerabilities",
+    "version",
+    "dependency-management",
+    "dependency-check"
+  ],
+  "author": "Tirtha Sarker",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tirtha4/DepDrift.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tirtha4/DepDrift/issues"
+  },
+  "homepage": "https://github.com/tirtha4/DepDrift#readme",
+  "files": [
+    "bin/",
+    "src/",
+    "LICENSE",
+    "README.md"
+  ],
+  "dependencies": {
+    "axios": "^1.6.8",
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.3",
+    "fs-extra": "^11.2.0",
+    "glob": "^10.4.5",
+    "semver": "^7.6.0",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@npmcli/arborist": "^8.0.0",
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
