@@ -3,7 +3,7 @@
  * @module utils/driftUtils
  */
 
-const semver = require('semver');
+import semver from 'semver';
 
 /**
  * Calculate days between two dates
@@ -321,7 +321,7 @@ function summarizeDriftLevels (dependencies) {
   return summary;
 }
 
-module.exports = {
+export {
   daysBetween,
   calculateDriftLevel,
   calculateDriftLevelByDays,
