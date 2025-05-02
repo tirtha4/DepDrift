@@ -13,366 +13,382 @@ import { hideBin } from 'yargs/helpers';
 import { assessDependencies, generateRecommendations } from '../src/core/assessor.js';
 import fs from 'fs-extra';
 import chalk from 'chalk';
-import { createRequire } from 'module';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const require = createRequire(import.meta.url);
 
 process.title = 'depdrift';
 
-// Check if 'help' was passed as an argument, and if so, execute the help script directly
-if (process.argv.includes('help')) {
-  // Execute the dedicated help script
-  require('./depdrift-help');
-  process.exit(0);
-}
-
-async function main(argv) {
+// Handle help command immediately
+async function loadAndExecuteHelp() {
   try {
-    // If no command is provided, or if a command is provided but it's not 'analyze' or 'help'
-    if (argv._.length === 0 || (!argv._.includes('analyze') && !argv._.includes('help'))) {
-      // Default to showing version
-      console.log(require('../package.json').version);
-      return;
-    }
-    
-    // If the command is not 'analyze', exit early (help is handled separately)
-    if (!argv._.includes('analyze')) {
-      return;
-    }
-    
-    // Process paths
-    let packageJsonPath = argv.path;
-    
-    if (!packageJsonPath) {
-      // Try to find package.json in current directory
-      packageJsonPath = resolve(process.cwd(), 'package.json');
-      
-      if (!fs.existsSync(packageJsonPath)) {
-        console.error('Error: Could not find package.json in current directory');
-        process.exit(1);
-      }
-    }
-    
-    // Run the analysis
-    const results = await assessDependencies(packageJsonPath, {
-      includeDevDependencies: true,
-      includePeerDependencies: true,
-      includeOptionalDependencies: true,
-      checkSecurity: !argv.noSecurity,
-      useCache: false, // Disable cache to use the latest logic
-      maxConcurrent: 5
-    });
-
-    // Post-process the results to apply our drift level rules directly
-    results.dependencies.forEach(dep => {
-      // Apply the patch version cap rule
-      if (dep.currentVersion && dep.latestVersion) {
-        const current = dep.currentVersion.split('.');
-        const latest = dep.latestVersion.split('.');
-        
-        // If same major and minor version (only patch difference)
-        if (current[0] === latest[0] && current[1] === latest[1] && 
-            (dep.driftLevel === 'critical' || dep.driftLevel === 'high')) {
-          // Cap at medium for patch updates
-          dep.driftLevel = 'medium';
-        }
-      }
-      
-      // SIMULATION CODE - UNCOMMENT FOR TESTING
-      /*
-      // Simulate a security vulnerability for axios (for testing only)
-      if (dep.name === 'axios') {
-        dep.security = {
-          vulnerable: true,
-          highestSeverity: 'high',
-          vulnerabilities: [
-            {
-              id: 'SIMULATED-CVE-2025-1234',
-              title: 'Simulated Remote Code Execution',
-              severity: 'high',
-              url: 'https://example.com/cve-2025-1234',
-              publishedAt: new Date().toISOString(),
-              patchedIn: '1.9.0',
-              recommendation: 'Update to 1.9.0 or later',
-              source: 'npm'
-            }
-          ]
-        };
-      }
-      */
-    });
-    
-    // SIMULATION CODE - UNCOMMENT FOR TESTING
-    /*
-    // Update overall assessment for the simulated vulnerability
-    if (results.overallAssessment) {
-      results.overallAssessment.vulnerableDependencies = 1;
-      results.overallAssessment.securityScore = 40; // Medium security risk
-      results.overallAssessment.combinedScore = Math.round((results.overallAssessment.driftScore + results.overallAssessment.securityScore) / 2);
-      
-      // Update status based on combined score
-      if (results.overallAssessment.combinedScore > 70) {
-        results.overallAssessment.status = 'critical';
-      } else if (results.overallAssessment.combinedScore > 50) {
-        results.overallAssessment.status = 'poor';
-      } else if (results.overallAssessment.combinedScore > 30) {
-        results.overallAssessment.status = 'fair';
-      } else if (results.overallAssessment.combinedScore > 10) {
-        results.overallAssessment.status = 'good';
-      } else {
-        results.overallAssessment.status = 'excellent';
-      }
-    }
-    
-    // Update security summary 
-    if (!results.securitySummary) {
-      results.securitySummary = {
-        severityCounts: {
-          critical: 0,
-          high: 1,
-          medium: 0,
-          low: 0,
-          none: results.dependencies.length - 1
-        },
-        sources: {
-          'npm': 1
-        }
-      };
-    }
-    */
-
-    // Use the formatter based on the format option
-    if (argv.format === 'table') {
-      // Import the table formatter
-      const tableFormatter = await import('../src/formatters/tableFormatter.js');
-      const { formatAnalysisAsTables } = tableFormatter;
-      
-      // Generate recommendations
-      const recommendations = generateRecommendations(results, {
-        maxRecommendations: 5
-      });
-      
-      // Enhance recommendations with security info
-      recommendations.forEach(rec => {
-        const dep = results.dependencies.find(d => d.name === rec.dependencyName);
-        if (dep && dep.security && dep.security.vulnerable) {
-          rec.hasSecurity = true;
-          
-          // Add security details if not already present
-          if (!rec.details.toLowerCase().includes('security')) {
-            const vulnCount = dep.security.vulnerabilities?.length || 0;
-            const severity = dep.security.highestSeverity;
-            rec.details += ` (${severity} security vulnerability${vulnCount > 1 ? 's' : ''})`;
-          }
-        }
-        
-        // Update terminology
-        rec.details = rec.details.replace(/(\w+) drift: (\d+) days behind/, '$1 drift: $2 days since latest release');
-      });
-      
-      // Add recommendations to results
-      results.recommendations = recommendations;
-      
-      // Convert CLI sort options to formatter sort options
-      let formatterSortBy;
-      switch (argv.sortBy.toLowerCase()) {
-        case 'driftlevel': formatterSortBy = 'drift'; break;
-        case 'daysbehind': formatterSortBy = 'days'; break;
-        case 'security': formatterSortBy = 'security'; break;
-        case 'name': formatterSortBy = 'name'; break;
-        default: formatterSortBy = 'drift';
-      }
-      
-      // Get the formatted output
-      const output = formatAnalysisAsTables(results, {
-        includeSecurity: !argv.noSecurity,
-        sortBy: formatterSortBy,
-        sortDirection: argv.sortDirection.toLowerCase(),
-        useImprovedFormat: true,
-        showAll: argv.showAll
-      });
-      
-      // Print the formatted output
-      console.log(output);
-      return;
-    }
-
-    // If not using the table formatter, continue with the original formatting
-    console.log(`Project: ${results.projectName}@${results.projectVersion}`);
-    console.log(`Dependencies: ${results.dependencies.length}`);
-    
-    // Sort dependencies if requested
-    if (argv.sortBy) {
-      const sortBy = argv.sortBy.toLowerCase();
-      const sortDirection = argv.sortDirection.toLowerCase() === 'asc' ? 1 : -1;
-      
-      results.dependencies.sort((a, b) => {
-        let aValue, bValue;
-        
-        switch (sortBy) {
-          case 'name':
-            return sortDirection * a.name.localeCompare(b.name);
-          case 'driftlevel':
-            const driftOrder = { critical: 4, high: 3, medium: 2, low: 1, none: 0 };
-            aValue = driftOrder[a.driftLevel || 'none'];
-            bValue = driftOrder[b.driftLevel || 'none'];
-            break;
-          case 'daysbehind':
-            aValue = a.daysBehind || 0;
-            bValue = b.daysBehind || 0;
-            break;
-          case 'security':
-            const securityOrder = { critical: 4, high: 3, medium: 2, low: 1, none: 0 };
-            aValue = securityOrder[(a.security?.highestSeverity || 'none')];
-            bValue = securityOrder[(b.security?.highestSeverity || 'none')];
-            break;
-          default:
-            return 0;
-        }
-        
-        return sortDirection * (bValue - aValue);
-      });
-    }
-    
-    // Filter dependencies to show only outdated ones if requested
-    if (!argv.showAll) {
-      results.dependencies = results.dependencies.filter(dep => 
-        dep.driftLevel !== 'none' || 
-        (dep.security && dep.security.vulnerable)
-      );
-    }
-    
-    // Display all dependencies with their drift levels
-    console.log(chalk.yellow.bold('\nDependencies:'));
-    results.dependencies.forEach(dep => {
-      const currentVersion = chalk.cyan(dep.currentVersion);
-      const latestVersion = dep.currentVersion !== dep.latestVersion 
-        ? chalk.yellow(dep.latestVersion) 
-        : chalk.green(dep.latestVersion);
-        
-      const driftLabel = formatDriftLevel(dep.driftLevel);
-      const daysBehind = dep.daysBehind || 0;
-      
-      // Change the wording based on whether the user has the latest version
-      let timeInfo;
-      if (dep.driftLevel === 'none') {
-        timeInfo = `last published ${daysBehind} days ago`;
-      } else {
-        timeInfo = `${daysBehind} days behind`;
-      }
-      
-      console.log(`${chalk.white.bold(dep.name)}: ${currentVersion} → ${latestVersion} (${driftLabel}, ${timeInfo})`);
-      
-      // Show security info if available
-      if (dep.security && dep.security.vulnerable) {
-        console.log(`  ${chalk.red('⚠')} Security: ${dep.security.highestSeverity}, ${dep.security.vulnerabilities.length} issues`);
-      }
-    });
-    
-    // Generate recommendations
-    const recommendations = generateRecommendations(results, {
-      maxRecommendations: 5
-    });
-    
-    // Enhance recommendations with security info
-    recommendations.forEach(rec => {
-      const dep = results.dependencies.find(d => d.name === rec.dependencyName);
-      if (dep && dep.security && dep.security.vulnerable) {
-        rec.hasSecurity = true;
-        
-        // Add security details if not already present
-        if (!rec.details.toLowerCase().includes('security')) {
-          const vulnCount = dep.security.vulnerabilities?.length || 0;
-          const severity = dep.security.highestSeverity;
-          rec.details += ` (${severity} security vulnerability${vulnCount > 1 ? 's' : ''})`;
-        }
-      }
-      
-      // Update terminology
-      rec.details = rec.details.replace(/(\w+) drift: (\d+) days behind/, '$1 drift: $2 days since latest release');
-    });
-    
-    if (recommendations.length > 0) {
-      console.log(chalk.yellow.bold('\nTop Recommendations:'));
-      recommendations.forEach((rec, index) => {
-        console.log(`${chalk.cyan(`[${index + 1}]`)} ${chalk.white.bold(rec.dependencyName)}@${rec.currentVersion}: ${chalk.yellow(rec.recommendation)}`);
-        
-        console.log(`     ${chalk.gray(rec.details)}`);
-      });
-    } else {
-      console.log(chalk.green.bold('\n✓ No recommendations needed - everything looks good!'));
-    }
-  } catch (error) {
-    console.error('Error:', error);
+    const helpModule = await import('./depdrift-help.js');
+    // The help module will display help and exit
+  } catch (err) {
+    console.error('Error loading help:', err);
     process.exit(1);
   }
 }
 
-// Helper function to format drift level
-function formatDriftLevel(level) {
-  if (!level) return 'unknown';
-  
-  switch (level.toLowerCase()) {
-    case 'critical': return chalk.red.bold('Critical');
-    case 'high': return chalk.red('High');
-    case 'medium': return chalk.yellow('Medium');
-    case 'low': return chalk.green('Low');
-    case 'none': return chalk.green('None');
-    default: return level;
-  }
+// Check if 'help' was passed as an argument, and if so, execute the help script directly
+if (process.argv.includes('help')) {
+  // Execute the dedicated help script
+  loadAndExecuteHelp();
+  // Don't exit immediately, let the promise resolve
 }
+else {
+  // Get version from package.json
+  function getVersion() {
+    try {
+      const packageJsonPath = resolve(__dirname, '../package.json');
+      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+      return packageJson.version;
+    } catch (err) {
+      console.error('Could not read package version:', err);
+      return 'unknown';
+    }
+  }
 
-// Parse arguments and run main function
-const argv = yargs(hideBin(process.argv))
-  .usage('Usage: $0 [command] [options]')
-  .example('$0', 'Show version')
-  .example('$0 analyze', 'Analyze dependencies in current directory')
-  .example('$0 analyze --path ./my-project', 'Analyze dependencies in a specific directory')
-  .example('$0 analyze --sort-by security', 'Sort dependencies by security severity')
-  .example('$0 help', 'Show detailed help')
-  .command('$0', 'Show version information')
-  .command('analyze', 'Analyze dependency drift', (yargs) => {
-    return yargs
-      .option('path', {
-        alias: 'p',
-        describe: 'Path to package.json file',
-        type: 'string'
-      })
-      .option('format', {
-        alias: 'f',
-        describe: 'Output format',
-        choices: ['text', 'json', 'table'],
-        default: 'table'
-      })
-      .option('show-all', {
-        alias: 'a',
-        describe: 'Show all dependencies, not just outdated ones',
-        type: 'boolean',
-        default: true
-      })
-      .option('sort-by', {
-        alias: 's',
-        describe: 'Sort dependencies by field',
-        choices: ['name', 'driftLevel', 'daysBehind', 'security'],
-        default: 'driftLevel'
-      })
-      .option('sort-direction', {
-        alias: 'd',
-        describe: 'Sort direction',
-        choices: ['asc', 'desc'],
-        default: 'desc'
-      })
-      .option('no-security', {
-        describe: 'Skip security vulnerability checks',
-        type: 'boolean',
-        default: false
+  async function main(argv) {
+    try {
+      // If no command is provided, or if a command is provided but it's not 'analyze' or 'help'
+      if (argv._.length === 0 || (!argv._.includes('analyze') && !argv._.includes('help'))) {
+        // Default to showing version
+        console.log(getVersion());
+        return;
+      }
+      
+      // If the command is not 'analyze', exit early (help is handled separately)
+      if (!argv._.includes('analyze')) {
+        return;
+      }
+      
+      // Process paths
+      let packageJsonPath = argv.path;
+      
+      if (!packageJsonPath) {
+        // Try to find package.json in current directory
+        packageJsonPath = resolve(process.cwd(), 'package.json');
+        
+        if (!fs.existsSync(packageJsonPath)) {
+          console.error('Error: Could not find package.json in current directory');
+          process.exit(1);
+        }
+      }
+      
+      // Run the analysis
+      const results = await assessDependencies(packageJsonPath, {
+        includeDevDependencies: true,
+        includePeerDependencies: true,
+        includeOptionalDependencies: true,
+        checkSecurity: !argv.noSecurity,
+        useCache: false, // Disable cache to use the latest logic
+        maxConcurrent: 5
       });
-  })
-  .command('help', 'Display detailed help information')
-  .help()
-  .parse();
 
-// Run the main function with our parsed arguments
-main(argv); 
+      // Post-process the results to apply our drift level rules directly
+      results.dependencies.forEach(dep => {
+        // Apply the patch version cap rule
+        if (dep.currentVersion && dep.latestVersion) {
+          const current = dep.currentVersion.split('.');
+          const latest = dep.latestVersion.split('.');
+          
+          // If same major and minor version (only patch difference)
+          if (current[0] === latest[0] && current[1] === latest[1] && 
+              (dep.driftLevel === 'critical' || dep.driftLevel === 'high')) {
+            // Cap at medium for patch updates
+            dep.driftLevel = 'medium';
+          }
+        }
+        
+        // SIMULATION CODE - UNCOMMENT FOR TESTING
+        /*
+        // Simulate a security vulnerability for axios (for testing only)
+        if (dep.name === 'axios') {
+          dep.security = {
+            vulnerable: true,
+            highestSeverity: 'high',
+            vulnerabilities: [
+              {
+                id: 'SIMULATED-CVE-2025-1234',
+                title: 'Simulated Remote Code Execution',
+                severity: 'high',
+                url: 'https://example.com/cve-2025-1234',
+                publishedAt: new Date().toISOString(),
+                patchedIn: '1.9.0',
+                recommendation: 'Update to 1.9.0 or later',
+                source: 'npm'
+              }
+            ]
+          };
+        }
+        */
+      });
+      
+      // SIMULATION CODE - UNCOMMENT FOR TESTING
+      /*
+      // Update overall assessment for the simulated vulnerability
+      if (results.overallAssessment) {
+        results.overallAssessment.vulnerableDependencies = 1;
+        results.overallAssessment.securityScore = 40; // Medium security risk
+        results.overallAssessment.combinedScore = Math.round((results.overallAssessment.driftScore + results.overallAssessment.securityScore) / 2);
+        
+        // Update status based on combined score
+        if (results.overallAssessment.combinedScore > 70) {
+          results.overallAssessment.status = 'critical';
+        } else if (results.overallAssessment.combinedScore > 50) {
+          results.overallAssessment.status = 'poor';
+        } else if (results.overallAssessment.combinedScore > 30) {
+          results.overallAssessment.status = 'fair';
+        } else if (results.overallAssessment.combinedScore > 10) {
+          results.overallAssessment.status = 'good';
+        } else {
+          results.overallAssessment.status = 'excellent';
+        }
+      }
+      
+      // Update security summary 
+      if (!results.securitySummary) {
+        results.securitySummary = {
+          severityCounts: {
+            critical: 0,
+            high: 1,
+            medium: 0,
+            low: 0,
+            none: results.dependencies.length - 1
+          },
+          sources: {
+            'npm': 1
+          }
+        }
+      }
+      */
+
+      // Use the formatter based on the format option
+      if (argv.format === 'table') {
+        // Import the table formatter
+        const tableFormatter = await import('../src/formatters/tableFormatter.js');
+        const { formatAnalysisAsTables } = tableFormatter;
+        
+        // Generate recommendations
+        const recommendations = generateRecommendations(results, {
+          maxRecommendations: 5
+        });
+        
+        // Enhance recommendations with security info
+        recommendations.forEach(rec => {
+          const dep = results.dependencies.find(d => d.name === rec.dependencyName);
+          if (dep && dep.security && dep.security.vulnerable) {
+            rec.hasSecurity = true;
+            
+            // Add security details if not already present
+            if (!rec.details.toLowerCase().includes('security')) {
+              const vulnCount = dep.security.vulnerabilities?.length || 0;
+              const severity = dep.security.highestSeverity;
+              rec.details += ` (${severity} security vulnerability${vulnCount > 1 ? 's' : ''})`;
+            }
+          }
+          
+          // Update terminology
+          rec.details = rec.details.replace(/(\w+) drift: (\d+) days behind/, '$1 drift: $2 days since latest release');
+        });
+        
+        // Add recommendations to results
+        results.recommendations = recommendations;
+        
+        // Convert CLI sort options to formatter sort options
+        let formatterSortBy;
+        switch (argv.sortBy.toLowerCase()) {
+          case 'driftlevel': formatterSortBy = 'drift'; break;
+          case 'daysbehind': formatterSortBy = 'days'; break;
+          case 'security': formatterSortBy = 'security'; break;
+          case 'name': formatterSortBy = 'name'; break;
+          default: formatterSortBy = 'drift';
+        }
+        
+        // Add explanation text to help users interpret the table
+        const explanationText = `
+📋 Understanding the Table:
+  • Package: Dependency name and type
+  • Current: The version you currently have installed
+  • Latest: The latest version available
+  • Update Status: Whether you need to update the package
+      - Up to date: You have the latest version (even if that version is old)
+      - Needs update: A newer version is available
+  • Last Published: When the latest version was published by the maintainer
+      - A package can be Up to date but still show a last published date from long ago
+      - This means you have the latest version, but that version itself is old
+  • Drift: The version drift level calculated from version difference
+  • Security: Whether the package has security vulnerabilities
+`;
+        
+        // Format with additional explanation and options
+        const output = formatAnalysisAsTables(results, {
+          includeSecurity: !argv.noSecurity,
+          sortBy: formatterSortBy,
+          sortDirection: argv.sortDirection.toLowerCase(),
+          useImprovedFormat: true,
+          showAll: argv.showAll,
+          explanationText
+        });
+        
+        // Print the formatted output
+        console.log(output);
+        return;
+      }
+      
+      // JSON format
+      if (argv.format === 'json') {
+        // Import the JSON formatter
+        const { generateJsonReport } = await import('../src/formatters/jsonFormatter.js');
+        
+        // Generate the JSON report
+        const jsonOutput = generateJsonReport(results);
+        
+        // If output path is provided, save to file
+        if (argv.output) {
+          await fs.writeFile(argv.output, jsonOutput);
+          console.log(chalk.green(`JSON report saved to ${argv.output}`));
+        } else {
+          // Print to console
+          console.log(jsonOutput);
+        }
+        return;
+      }
+      
+      // HTML format
+      if (argv.format === 'html') {
+        // Import the HTML formatter
+        const { generateHtmlReport, saveHtmlReport } = await import('../src/formatters/htmlFormatter.js');
+        
+        // Generate the HTML report
+        const htmlOutput = generateHtmlReport(results);
+        
+        // Determine the output path
+        const outputPath = argv.output || resolve(process.cwd(), 'analysis.html');
+        
+        // Save the HTML report to file
+        await saveHtmlReport(htmlOutput, outputPath);
+        console.log(chalk.green(`HTML report saved to ${outputPath}`));
+        return;
+      }
+      
+      // Text format
+      if (argv.format === 'text') {
+        // Import text formatter functions
+        const { formatOutput } = await import('../src/formatters/textFormatter.js');
+        
+        // Make sure totalDependencies and outdatedDependencies are set
+        if (!results.totalDependencies) {
+          results.totalDependencies = results.dependencies.length;
+        }
+        
+        if (!results.outdatedDependencies) {
+          results.outdatedDependencies = results.dependencies.filter(d => d.driftLevel !== 'none').length;
+        }
+        
+        // Add format option to results
+        results.options = {
+          format: 'text',
+          sortBy: argv.sortBy.toLowerCase(),
+          sortDirection: argv.sortDirection.toLowerCase(),
+          showAll: argv.showAll,
+          summary: true
+        };
+        
+        // Generate text report
+        const textOutput = formatOutput(results, true); // true for colorize
+        
+        // If output path is provided, save to file
+        if (argv.output) {
+          await fs.writeFile(argv.output, textOutput);
+          console.log(chalk.green(`Text report saved to ${argv.output}`));
+        } else {
+          // Print to console
+          console.log(textOutput);
+        }
+        return;
+      }
+
+      // Default to console.log for unsupported formats
+      console.log(JSON.stringify(results, null, 2));
+    } catch (error) {
+      console.error('Error:', error);
+      process.exit(1);
+    }
+  }
+
+  // Helper function to format drift level
+  function formatDriftLevel(level) {
+    if (!level) return 'unknown';
+    
+    switch (level.toLowerCase()) {
+      case 'critical': return chalk.red.bold('Critical');
+      case 'high': return chalk.red('High');
+      case 'medium': return chalk.yellow('Medium');
+      case 'low': return chalk.green('Low');
+      case 'none': return chalk.green('None');
+      default: return level;
+    }
+  }
+
+  // Parse arguments and run main function
+  const argv = yargs(hideBin(process.argv))
+    .usage('Usage: $0 [command] [options]')
+    .example('$0', 'Show version')
+    .example('$0 analyze', 'Analyze dependencies in current directory')
+    .example('$0 analyze --path ./my-project', 'Analyze dependencies in a specific directory')
+    .example('$0 analyze --sort-by security', 'Sort dependencies by security severity')
+    .example('$0 analyze --format html', 'Generate an HTML report in analysis.html')
+    .example('$0 analyze --format html --output report.html', 'Generate an HTML report with custom filename')
+    .example('$0 help', 'Show detailed help')
+    .command('$0', 'Show version information')
+    .command('analyze', 'Analyze dependency drift', (yargs) => {
+      return yargs
+        .option('path', {
+          alias: 'p',
+          describe: 'Path to package.json file',
+          type: 'string'
+        })
+        .option('format', {
+          alias: 'f',
+          describe: 'Output format (html will save to analysis.html by default)',
+          choices: ['text', 'json', 'table', 'html'],
+          default: 'table'
+        })
+        .option('show-all', {
+          alias: 'a',
+          describe: 'Show all dependencies, not just outdated ones',
+          type: 'boolean',
+          default: true
+        })
+        .option('sort-by', {
+          alias: 's',
+          describe: 'Sort dependencies by field',
+          choices: ['name', 'driftLevel', 'daysBehind', 'security'],
+          default: 'driftLevel'
+        })
+        .option('sort-direction', {
+          alias: 'd',
+          describe: 'Sort direction',
+          choices: ['asc', 'desc'],
+          default: 'desc'
+        })
+        .option('no-security', {
+          describe: 'Skip security vulnerability checks',
+          type: 'boolean',
+          default: false
+        })
+        .option('output', {
+          alias: 'o',
+          describe: 'Output file path',
+          type: 'string'
+        });
+    })
+    .command('help', 'Display detailed help information')
+    .help()
+    .parse();
+
+  // Run the main function with our parsed arguments
+  main(argv);
+} 
