@@ -3,18 +3,23 @@
 /**
  * Wrapper for depdrift with improved table format
  * Features:
- * - Clearer column names distinguishing "Update Status" and "Last Updated"
+ * - Clearer column names distinguishing "Update Status" and "Last Published"
  * - Terminal width awareness that adjusts table width automatically
  * - Detailed explanation of what each column means
  */
 
-const path = require('path');
-const fs = require('fs-extra');
-const chalk = require('chalk');
-const { assessDependencies, generateRecommendations } = require('../src/dependencyAssessor');
-const { formatAnalysisAsTables } = require('../src/formatters/tableFormatter');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
+import path from 'path';
+import fs from 'fs-extra';
+import chalk from 'chalk';
+import { assessDependencies, generateRecommendations } from '../src/core/assessor.js';
+import { formatAnalysisAsTables } from '../src/formatters/tableFormatter.js';
+import yargs from 'yargs/yargs';
+import { hideBin } from 'yargs/helpers';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Set chalk level to force colorization
 chalk.level = 2;
@@ -62,7 +67,7 @@ const argv = yargs(hideBin(process.argv))
   })
   .help()
   .alias('help', 'h')
-  .argv;
+  .parse();
 
 /**
  * Parse exclude types string into an object
@@ -135,10 +140,11 @@ async function main() {
     });
     
     // Format with improved table
-    const output = formatAnalysisAsTables(results, recommendations, {
+    const output = formatAnalysisAsTables(results, {
       includeSecurity: !argv.noSecurity,
       sortBy: argv.sortBy,
-      useImprovedFormat: true
+      useImprovedFormat: true,
+      recommendations
     });
     
     // Output results
