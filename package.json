@@ -10,6 +10,11 @@
   "scripts": {
     "start": "node bin/depdrift",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+    "test:graphbuilder": "node test/run-graphbuilder-tests.js",
+    "test:graphbuilder:unit": "node test/run-graphbuilder-tests.js --unit",
+    "test:graphbuilder:integration": "node test/run-graphbuilder-tests.js --integration",
+    "test:graphbuilder:performance": "node test/run-graphbuilder-tests.js --performance",
+    "test:graphbuilder:coverage": "node test/run-graphbuilder-tests.js --all --coverage",
     "self-analyze": "node bin/depdrift",
     "lint": "eslint src",
     "prepublishOnly": "npm test"
@@ -52,7 +57,11 @@
     "yargs": "^17.7.2"
   },
   "devDependencies": {
+    "@babel/core": "^7.27.1",
+    "@babel/plugin-transform-modules-commonjs": "^7.27.1",
+    "@babel/preset-env": "^7.27.1",
     "@npmcli/arborist": "^8.0.0",
+    "babel-jest": "^29.7.0",
     "eslint": "^9.25.1",
     "jest": "^29.7.0"
   },
