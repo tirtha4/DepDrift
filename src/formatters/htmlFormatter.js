@@ -75,7 +75,7 @@ function generateHtmlReport(results) {
               '<span class="none">Up to date</span>' : 
               `<span class="${dep.driftLevel}">Needs update (${dep.daysBehind || 0} days behind)</span>`}
           </td>
-          <td class="last-published ${dep.driftLevel === 'none' ? 'none' : dep.driftLevel === 'high' ? 'critical' : dep.driftLevel === 'medium' ? 'warning' : 'error'}">${new Date(dep.lastUpdated).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'Unknown'}</td>
+          <td class="last-published ${dep.driftLevel === 'none' ? 'none' : dep.driftLevel === 'high' ? 'critical' : dep.driftLevel === 'medium' ? 'warning' : 'error'}">${new Date(dep.lastPublished).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'Unknown'}</td>
           <td class="drift-level ${dep.driftLevel}">${capitalizeDriftLevel(dep.driftLevel || 'none')}</td>
           <td>${renderSecurityIssues(dep)}</td>
         </tr>

@@ -147,7 +147,7 @@ function formatDependency (dependency) {
     latestVersion,
     daysBehind,
     driftLevel,
-    lastUpdated
+    lastPublished
   } = dependency;
 
   let output = `${chalk.bold(name)}\n`;
@@ -160,7 +160,7 @@ function formatDependency (dependency) {
   }
   
   // Clarify that "Last updated" refers to when the package was published
-  output += `  Last published: ${formatDate(lastUpdated)}\n`;
+  output += `  Last published: ${formatDate(lastPublished)}\n`;
   
   // Use consistent field name "Status" but different content based on up-to-date status
   if (driftLevel === 'none') {
@@ -239,7 +239,7 @@ function formatAsTable (results, options = {}) {
     }
 
     // Format the last published date
-    const lastPublished = formatDate(dep.lastUpdated);
+    const lastPublished = formatDate(dep.lastPublished);
 
     table.push([
       dep.name,
@@ -357,7 +357,7 @@ function formatAsJson (results) {
       status: dep.driftLevel === 'none' ? 'up-to-date' : 'needs-update',
       daysBehind: dep.daysBehind,
       driftLevel: dep.driftLevel,
-      lastPublished: dep.lastUpdated,
+      lastPublished: dep.lastPublished,
       type: dep.type || 'regular'
     }))
   };

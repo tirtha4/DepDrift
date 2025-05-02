@@ -32,7 +32,7 @@ function generateJsonReport(results) {
       status: dep.driftLevel === 'none' ? 'up-to-date' : 'needs-update',
       daysBehind: dep.daysBehind || 0,
       driftLevel: dep.driftLevel || 'none',
-      lastPublished: dep.lastUpdated,
+      lastPublished: dep.lastPublished,
       security: formatSecurityInfo(dep.security)
     })),
     recommendations: results.recommendations || []
