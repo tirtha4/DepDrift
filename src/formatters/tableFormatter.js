@@ -64,7 +64,7 @@ function createDependencyTable (analysis, options = {}) {
 
   // Define table columns based on options
   const columns = useImprovedFormat
-    ? ['Package', 'Current', 'Latest', 'Update Status', 'Last Updated', 'Drift']
+    ? ['Package', 'Current', 'Latest', 'Update Status', 'Last Published', 'Drift']
     : compact
       ? ['Package', 'Current', 'Latest', 'Drift']
       : ['Package', 'Current', 'Latest', 'Days Behind', 'Drift'];
@@ -84,7 +84,7 @@ function createDependencyTable (analysis, options = {}) {
   let colWidths;
 
   if (useImprovedFormat) {
-    // Package, Current, Latest, Update Status, Last Updated, Drift, [Security]
+    // Package, Current, Latest, Update Status, Last Published, Drift, [Security]
     if (includeSecurity) {
       colWidths = calculateColumnWidths(tableWidth, [3, 1.5, 1.5, 3, 2, 1.5, 2.5]);
     } else {
@@ -216,11 +216,11 @@ function createDependencyTable (analysis, options = {}) {
         row.push(chalk.green('Up to date'));
       }
 
-      // Last Updated column
-      const lastUpdated = dep.latestPublishDate ?
+      // Last Published column
+      const lastPublished = dep.latestPublishDate ?
         formatTimeAgo(new Date(dep.latestPublishDate)) :
         formatTimeAgo(new Date(Date.now() - (dep.daysBehind * 24 * 60 * 60 * 1000)));
-      row.push(getDaysBehindDisplay(lastUpdated, dep.daysBehind));
+      row.push(getDaysBehindDisplay(lastPublished, dep.daysBehind));
     } else if (!compact) {
       // Traditional Days behind column (if not compact mode)
       row.push(getDaysBehindDisplay(dep.daysBehind));
@@ -464,8 +464,8 @@ ${chalk.cyan.bold('📋 Understanding the Table:')}
   • ${chalk.cyan.bold('Update Status:')} Whether you need to update the package
       - ${chalk.green('Up to date:')} You have the latest version (even if that version is old)
       - ${chalk.yellow('Needs update:')} A newer version is available
-  • ${chalk.cyan.bold('Last Updated:')} When the latest version was published
-      - A package can be ${chalk.green('Up to date')} but still show ${chalk.yellow('Last Updated: 1 year ago')}
+  • ${chalk.cyan.bold('Last Published:')} When the latest version was published
+      - A package can be ${chalk.green('Up to date')} but still show ${chalk.yellow('Last Published: 1 year ago')}
       - This means you have the latest version, but that version itself is old
   • ${chalk.cyan.bold('Drift:')} The version drift level calculated from version difference
   • ${chalk.cyan.bold('Security:')} Whether the package has security vulnerabilities
