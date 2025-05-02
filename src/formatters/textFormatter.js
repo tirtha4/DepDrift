@@ -1,7 +1,7 @@
-const chalk = require('chalk');
-const path = require('path');
-const fs = require('fs-extra');
-const Table = require('cli-table3');
+import chalk from 'chalk';
+import path from 'path';
+import fs from 'fs-extra';
+import Table from 'cli-table3';
 
 /**
  * Format drift level with color
@@ -88,8 +88,14 @@ function formatSummary (analysis) {
     return chalk.red('No analysis results available');
   }
 
-  const { projectName, totalDependencies, outdatedDependencies, driftSummary } = analysis;
-
+  const { projectName, dependencies } = analysis;
+  
+  // Get counts, using analysis.totalDependencies or calculating from dependencies
+  const totalDependencies = analysis.totalDependencies || (dependencies ? dependencies.length : 0);
+  const outdatedDependencies = analysis.outdatedDependencies || 
+    (dependencies ? dependencies.filter(d => d.driftLevel !== 'none').length : 0);
+  const upToDateDependencies = totalDependencies - outdatedDependencies;
+  
   // Count dependencies by drift level
   const driftCounts = {
     none: 0,
@@ -99,21 +105,29 @@ function formatSummary (analysis) {
     critical: 0
   };
 
-  if (driftSummary) {
+  // Try to get counts from driftSummary if available, otherwise calculate from dependencies
+  if (analysis.driftSummary && analysis.driftSummary.levels) {
     Object.keys(driftCounts).forEach(level => {
-      driftCounts[level] = driftSummary[level] || 0;
+      driftCounts[level] = analysis.driftSummary.levels[level] || 0;
+    });
+  } else if (dependencies) {
+    // Count manually
+    dependencies.forEach(dep => {
+      if (dep.driftLevel && driftCounts[dep.driftLevel] !== undefined) {
+        driftCounts[dep.driftLevel]++;
+      }
     });
   }
 
   // Build the summary string
   let summary = `\n${chalk.bold(projectName || 'Project')}\n\n`;
   summary += `Total dependencies: ${chalk.bold(totalDependencies)}\n`;
-  summary += `Outdated dependencies: ${chalk.bold(outdatedDependencies)}\n\n`;
+  summary += `Up-to-date: ${chalk.green.bold(upToDateDependencies)} | Needs update: ${chalk.yellow.bold(outdatedDependencies)}\n\n`;
 
   // Add drift levels breakdown
   summary += `${chalk.bold('Drift Levels:')}\n`;
-  summary += `  ${chalk.green('None')}: ${driftCounts.none}\n`;
-  summary += `  ${chalk.blue('Low')}: ${driftCounts.low}\n`;
+  summary += `  ${chalk.green('None')}: ${driftCounts.none} ${chalk.gray('(up to date)')}\n`;
+  summary += `  ${chalk.cyan('Low')}: ${driftCounts.low}\n`;
   summary += `  ${chalk.yellow('Medium')}: ${driftCounts.medium}\n`;
   summary += `  ${chalk.red('High')}: ${driftCounts.high}\n`;
   summary += `  ${chalk.bgRed.white('Critical')}: ${driftCounts.critical}\n`;
@@ -137,9 +151,24 @@ function formatDependency (dependency) {
   } = dependency;
 
   let output = `${chalk.bold(name)}\n`;
-  output += `  Version: ${formatVersions(currentVersion, latestVersion)}\n`;
-  output += `  Last updated: ${formatDate(lastUpdated)}\n`;
-  output += `  Behind by: ${formatDaysBehind(daysBehind)}\n`;
+  
+  // Show version differently depending on whether it's the latest or not
+  if (currentVersion === latestVersion || driftLevel === 'none') {
+    output += `  Version: ${chalk.green(currentVersion)} ${chalk.gray('(up to date)')}\n`;
+  } else {
+    output += `  Version: ${formatVersions(currentVersion, latestVersion)}\n`;
+  }
+  
+  // Clarify that "Last updated" refers to when the package was published
+  output += `  Last published: ${formatDate(lastUpdated)}\n`;
+  
+  // Use consistent field name "Status" but different content based on up-to-date status
+  if (driftLevel === 'none') {
+    output += `  Status: ${chalk.green('Up to date')}\n`;
+  } else {
+    output += `  Status: ${chalk.yellow('Needs update')} (${formatDaysBehind(daysBehind)} behind)\n`;
+  }
+  
   output += `  Drift level: ${formatDriftLevel(driftLevel)}\n`;
 
   return output;
@@ -190,9 +219,9 @@ function formatAsTable (results, options = {}) {
       chalk.bold('Package'),
       chalk.bold('Current'),
       chalk.bold('Latest'),
-      chalk.bold('Days Behind'),
-      chalk.bold('Drift Level'),
-      chalk.bold('Type')
+      chalk.bold('Update Status'),
+      chalk.bold('Last Published'),
+      chalk.bold('Drift Level')
     ],
     style: {
       head: [] // Empty style for head
@@ -201,15 +230,24 @@ function formatAsTable (results, options = {}) {
 
   // Add rows
   sortedDeps.forEach(dep => {
-    const daysBehind = dep.daysBehind < 0 ? '-' : dep.daysBehind;
+    // Format the update status
+    let updateStatus;
+    if (dep.driftLevel === 'none') {
+      updateStatus = chalk.green('Up to date');
+    } else {
+      updateStatus = chalk.yellow(`Needs update (${dep.daysBehind} days behind)`);
+    }
+
+    // Format the last published date
+    const lastPublished = formatDate(dep.lastUpdated);
 
     table.push([
       dep.name,
       dep.currentVersion || '-',
       dep.latestVersion || '-',
-      daysBehind,
-      formatDriftLevel(dep.driftLevel),
-      dep.type
+      updateStatus,
+      lastPublished,
+      formatDriftLevel(dep.driftLevel)
     ]);
   });
 
@@ -308,17 +346,19 @@ function formatAsJson (results) {
     timestamp: results.timestamp,
     summary: {
       totalDependencies: results.dependencies.length,
-      outdatedDependencies: results.dependencies.filter(d => d.driftLevel !== 'none').length,
+      upToDate: results.dependencies.filter(d => d.driftLevel === 'none').length,
+      needsUpdate: results.dependencies.filter(d => d.driftLevel !== 'none').length,
       driftLevels: results.driftSummary?.levels || {}
     },
     dependencies: results.dependencies.map(dep => ({
       name: dep.name,
       currentVersion: dep.currentVersion,
       latestVersion: dep.latestVersion,
+      status: dep.driftLevel === 'none' ? 'up-to-date' : 'needs-update',
       daysBehind: dep.daysBehind,
       driftLevel: dep.driftLevel,
-      lastUpdated: dep.lastUpdated,
-      type: dep.type
+      lastPublished: dep.lastUpdated,
+      type: dep.type || 'regular'
     }))
   };
 
@@ -388,7 +428,7 @@ async function saveOutput (content, outputPath) {
   }
 }
 
-module.exports = {
+export {
   formatDriftLevel,
   formatDaysBehind,
   formatVersions,
