@@ -2,12 +2,12 @@
  * Unified Reporter module for displaying and saving drift analysis results
  * @module formatters/reporter
  */
-const fs = require('fs-extra');
-const path = require('path');
-const chalk = require('chalk');
-const { formatDriftLevel, formatSecuritySeverity } = require('../utils/formatters');
-const tableFormatter = require('./tableFormatter');
-const textFormatter = require('./textFormatter');
+import fs from 'fs-extra';
+import path from 'path';
+import chalk from 'chalk';
+import { formatDriftLevel, formatSecuritySeverity } from '../utils/formatters.js';
+import * as tableFormatter from './tableFormatter.js';
+import * as textFormatter from './textFormatter.js';
 
 /**
  * Report dependency drift to console and/or file
@@ -278,16 +278,19 @@ async function reportDrift (records, options = {}) {
   });
 }
 
-// Use local name references to imported formatters to avoid circular dependencies
-const { formatAnalysisJson, formatAnalysisText, formatAnalysisCSV } = require('../utils/formatters');
+// Import formatters from utils
+import { formatAnalysisJson, formatAnalysisText, formatAnalysisCSV } from '../utils/formatters.js';
 
-module.exports = {
+// Export all functions
+export {
   reportAnalysis,
   generateSummary,
   saveReport,
   getStatusColor,
   // Legacy exports for backward compatibility
-  reportDrift,
-  generateDriftSummary: generateSummary,
-  saveDriftReport: saveReport
+  reportDrift
 };
+
+// Legacy exports with renaming - exported separately
+export const generateDriftSummary = generateSummary;
+export const saveDriftReport = saveReport;

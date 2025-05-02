@@ -1,81 +1,80 @@
 /**
- * DepDrift Formatters Module
- *
- * This module exports the output formatters for the DepDrift analysis results.
- *
+ * DepDrift Formatters
+ * Centralized export for all formatter modules
+ * 
  * @module formatters
  */
 
-'use strict';
+// Import from HTML formatter
+import { generateHtmlReport, saveHtmlReport } from './htmlFormatter.js';
 
-// Import formatters
-const {
-  formatAnalysisText,
-  formatAnalysisJson,
-  formatAnalysisCSV
-} = require('../utils/formatters');
-const tableFormatter = require('./tableFormatter');
-const textFormatter = require('./textFormatter');
-const { generateHtmlReport, saveHtmlReport } = require('./htmlFormatter');
-const reporter = require('./reporter');
+// Import from JSON formatter
+import { generateJsonReport } from './jsonFormatter.js';
 
-/**
- * Format analysis results as a table
- * @param {Object} results - Analysis results
- * @param {Object} options - Formatting options
- * @returns {string} Formatted table
- */
-function formatTable (results, options = {}) {
-  return tableFormatter.formatAnalysisAsTables(results, options);
-}
+// Import from Table formatter
+import {
+  createDependencyTable,
+  createSummaryTable,
+  createRecommendationsTable,
+  formatAnalysisAsTables
+} from './tableFormatter.js';
 
-/**
- * Format analysis results as HTML
- * @param {Object} results - Analysis results
- * @param {Object} options - Formatting options
- * @returns {string} Formatted HTML
- */
-function formatHtml (results, options = {}) {
-  return generateHtmlReport(results, options);
-}
+// Import from Reporter
+import {
+  reportAnalysis,
+  generateSummary,
+  saveReport,
+  reportDrift
+} from './reporter.js';
 
-/**
- * Unified function to report analysis results in any format
- * @param {Object} results - Analysis results
- * @param {Object} options - Formatting and reporting options
- * @returns {Promise<string>} The formatted output
- */
-async function report (results, options = {}) {
-  return reporter.reportAnalysis(results, options);
-}
+// Import from Text formatter
+import {
+  formatDriftLevel,
+  formatDaysBehind,
+  formatVersions,
+  formatDate,
+  formatSummary,
+  formatDependency,
+  formatDriftSummary,
+  formatSecurityInfo,
+  formatSecuritySeverity,
+  formatAsJson,
+  formatOutput,
+  saveOutput
+} from './textFormatter.js';
 
-// Export formatters
-module.exports = {
-  // Main formatting functions
-  formatText: formatAnalysisText,
-  formatJson: formatAnalysisJson,
-  formatCsv: formatAnalysisCSV,
-  formatTable,
-  formatHtml,
-
-  // Reporting functions
-  report,
-  saveReport: reporter.saveReport,
-  generateSummary: reporter.generateSummary,
-
-  // File output functions
-  saveHtmlReport,
-
-  // For backward compatibility
-  formatAnalysisText,
-  formatAnalysisJson,
-  formatAnalysisCSV,
+// Export all formatter functions
+export {
+  // HTML formatter functions
   generateHtmlReport,
-
-  // Reporter exports
-  reporter,
-
-  // Export original formatters for compatibility
-  ...tableFormatter,
-  ...textFormatter
+  saveHtmlReport,
+  
+  // JSON formatter functions
+  generateJsonReport,
+  
+  // Table formatter functions
+  createDependencyTable,
+  createSummaryTable,
+  createRecommendationsTable,
+  formatAnalysisAsTables,
+  
+  // Reporter functions
+  reportAnalysis,
+  generateSummary,
+  saveReport,
+  reportDrift,
+  
+  // Text formatter functions
+  formatDriftLevel,
+  formatDaysBehind,
+  formatVersions,
+  formatDate,
+  formatSummary,
+  formatDependency,
+  formatDriftSummary,
+  formatSecurityInfo,
+  formatSecuritySeverity,
+  formatAsJson,
+  formatOutput,
+  saveOutput
 };
