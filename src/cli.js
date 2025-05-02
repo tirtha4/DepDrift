@@ -4,20 +4,19 @@
  * Command line interface for DepDrift
  */
 
-const { assessDependencies, generateRecommendations } = require('./core/assessor');
-const { formatAnalysisText, formatAnalysisJson, formatAnalysisCSV } = require('./utils/formatters');
-const { formatAnalysisAsTables } = require('./formatters/tableFormatter');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
-const fs = require('fs-extra');
-const path = require('path');
-const chalk = require('chalk');
-const Table = require('cli-table3');
-const { handleError, handleWarning } = require('./utils/errorHandler');
-const { generateTable } = require('./formatters/tableFormatter');
-const { generateHtmlReport } = require('./formatters/htmlFormatter');
-const { formatAnalysisText } = require('./formatters/textFormatter');
-const { displayRecommendations, displayVulnerabilities } = require('./formatters/reporter');
+import { assessDependencies, generateRecommendations } from './core/assessor.js';
+import { formatAnalysisText, formatAnalysisJson, formatAnalysisCSV } from './utils/formatters.js';
+import { formatAnalysisAsTables } from './formatters/tableFormatter.js';
+import yargs from 'yargs/yargs';
+import { hideBin } from 'yargs/helpers';
+import fs from 'fs-extra';
+import path from 'path';
+import chalk from 'chalk';
+import Table from 'cli-table3';
+import { handleError, handleWarning } from './utils/errorHandler.js';
+import { generateTable } from './formatters/tableFormatter.js';
+import { generateHtmlReport } from './formatters/htmlFormatter.js';
+import { displayRecommendations, displayVulnerabilities } from './formatters/reporter.js';
 
 // Force chalk to enable colors for non-TTY environments when needed
 if (process.env.FORCE_COLOR) {
@@ -160,66 +159,6 @@ function formatTimeAgo (days) {
 }
 
 /**
- * Generate table for the analysis results
- * @param {Object} results - Analysis results
- * @returns {string} Table output
- */
-function generateTable (results) {
-  // Create a new table
-  const table = new Table({
-    head: [
-      chalk.cyan.bold('Package'),
-      chalk.cyan.bold('Current'),
-      chalk.cyan.bold('Latest'),
-      chalk.cyan.bold('Update Status'),
-      chalk.cyan.bold('Last Updated'),
-      chalk.cyan.bold('Drift'),
-      chalk.cyan.bold('Security')
-    ],
-    colWidths: [20, 12, 12, 25, 20, 15, 20]
-  });
-
-  // Add rows for each dependency
-  results.dependencies.forEach(dep => {
-    const hasVulnerabilities = dep.security &&
-      dep.security.vulnerable &&
-      dep.security.vulnerabilities.length > 0;
-
-    // Create update status message
-    let updateStatus;
-    if (dep.driftLevel === 'none') {
-      updateStatus = chalk.green('Up to date');
-    } else {
-      updateStatus = chalk.yellow(`Needs update (${dep.daysBehind} days behind)`);
-    }
-
-    // Prepare security info
-    let securityInfo = formatSecuritySeverity(dep.security?.highestSeverity || 'none');
-
-    if (hasVulnerabilities) {
-      const vulnCount = dep.security.vulnerabilities.length;
-      securityInfo += `\n${chalk.red(`${vulnCount} ${vulnCount === 1 ? 'issue' : 'issues'}`)}`;
-    }
-
-    // Calculate the date last updated (current date - days behind)
-    const lastUpdatedDays = dep.daysBehind || 0;
-    const lastUpdated = formatTimeAgo(lastUpdatedDays);
-
-    table.push([
-      chalk.white.bold(dep.name) + (dep.isDev ? chalk.gray(' [dev]') : ''),
-      dep.currentVersion,
-      dep.latestVersion,
-      updateStatus,
-      lastUpdated,
-      formatDriftLevel(dep.driftLevel),
-      securityInfo
-    ]);
-  });
-
-  return table.toString();
-}
-
-/**
  * Generate HTML report for the analysis results
  * @param {Object} results - Analysis results
  * @returns {string} HTML report
@@ -313,9 +252,9 @@ function generateHtmlReport (results) {
       font-weight: bold;
       color: #d73a49;
     }
-    .last-updated-recent { color: #28a745; }
-    .last-updated-medium { color: #ffcc00; }
-    .last-updated-old { color: #d73a49; }
+    .last-published-recent { color: #28a745; }
+    .last-published-medium { color: #ffcc00; }
+    .last-published-old { color: #d73a49; }
   </style>
 </head>
 <body>
@@ -336,7 +275,7 @@ function generateHtmlReport (results) {
         <th>Current</th>
         <th>Latest</th>
         <th>Update Status</th>
-        <th>Last Updated</th>
+        <th>Last Published</th>
         <th>Drift</th>
         <th>Security</th>
       </tr>
@@ -370,28 +309,28 @@ function generateHtmlReport (results) {
       updateStatusHtml = `<span class="updates-needed">Needs update (${dep.daysBehind} days behind)</span>`;
     }
 
-    // Create last updated class
-    let lastUpdatedClass = 'last-updated-recent';
-    if (dep.daysBehind > 90) {
-      lastUpdatedClass = 'last-updated-old';
-    } else if (dep.daysBehind > 30) {
-      lastUpdatedClass = 'last-updated-medium';
+    // Determine the appropriate class for last published date
+    let lastPublishedClass = 'last-published-recent';
+    if (dep.daysBehind > 365) {
+      lastPublishedClass = 'last-published-old';
+    } else if (dep.daysBehind > 90) {
+      lastPublishedClass = 'last-published-medium';
     }
 
-    // Format last updated date
-    let lastUpdatedText;
+    // Format the last published text
+    let lastPublishedText;
     if (dep.daysBehind === 0) {
-      lastUpdatedText = 'Today';
+      lastPublishedText = 'Today';
     } else if (dep.daysBehind === 1) {
-      lastUpdatedText = 'Yesterday';
-    } else if (dep.daysBehind < 30) {
-      lastUpdatedText = `${dep.daysBehind} days ago`;
+      lastPublishedText = 'Yesterday';
+    } else if (dep.daysBehind < 60) {
+      lastPublishedText = `${dep.daysBehind} days ago`;
     } else if (dep.daysBehind < 365) {
       const months = Math.floor(dep.daysBehind / 30);
-      lastUpdatedText = `${months} ${months === 1 ? 'month' : 'months'} ago`;
+      lastPublishedText = `${months} ${months === 1 ? 'month' : 'months'} ago`;
     } else {
       const years = Math.floor(dep.daysBehind / 365);
-      lastUpdatedText = `${years} ${years === 1 ? 'year' : 'years'} ago`;
+      lastPublishedText = `${years} ${years === 1 ? 'year' : 'years'} ago`;
     }
 
     // Prepare security info
@@ -408,7 +347,7 @@ function generateHtmlReport (results) {
         <td>${dep.currentVersion}</td>
         <td>${dep.latestVersion}</td>
         <td>${updateStatusHtml}</td>
-        <td class="${lastUpdatedClass}">${lastUpdatedText}</td>
+        <td class="${lastPublishedClass}">${lastPublishedText}</td>
         <td class="drift-${dep.driftLevel || 'none'}">${dep.driftLevel || 'none'}</td>
         <td>${securityHtml}</td>
       </tr>
@@ -423,7 +362,7 @@ function generateHtmlReport (results) {
     <h3>Explanation</h3>
     <ul>
       <li><strong>Update Status</strong>: Shows if you need to update the package</li>
-      <li><strong>Last Updated</strong>: When the latest version was published</li>
+      <li><strong>Last Published</strong>: When the latest version was published</li>
       <li><strong>Drift</strong>: How far your version is behind the latest</li>
       <li><strong>Security</strong>: Highest severity of any known vulnerabilities</li>
     </ul>
@@ -608,4 +547,4 @@ async function main (argv) {
   }
 }
 
-module.exports = { main };
+export { main };
