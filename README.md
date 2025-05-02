@@ -120,7 +120,7 @@ The table format provides a comprehensive view of your dependencies with color-c
 
 ```
 ┌───────────────┬──────────┬──────────┬───────────────┬──────────────┬─────────────┬─────────┐
-│ Package       │ Current  │ Latest   │ Update Status │ Last Updated │ Days Behind │ Drift   │
+│ Package       │ Current  │ Latest   │ Update Status │ Last Published │ Days Behind │ Drift   │
 ├───────────────┼──────────┼──────────┼───────────────┼──────────────┼─────────────┼─────────┤
 │ axios         │ 0.21.1   │ 1.6.7    │ Outdated      │ 30 days ago  │ 30          │ CRITICAL│
 │ chalk         │ 4.1.2    │ 5.3.0    │ Outdated      │ 180 days ago │ 180         │ HIGH    │
@@ -335,8 +335,8 @@ depdrift analyze --security-sources NPM_AUDIT,GITHUB,SNYK --format json > securi
   - Up to date: You have the latest version, even if that version is old
   - Needs update: A newer version is available
 
-- **Last Updated**: When the latest version was published
-  - A package can be "Up to date" but still show "Last Updated: 1 year ago"
+- **Last Published**: When the latest version was published
+  - A package can be "Up to date" but still show "Last Published: 1 year ago"
   - This means you have the latest version, but that version itself is old
 
 - **Security**: Whether the package has known security vulnerabilities
