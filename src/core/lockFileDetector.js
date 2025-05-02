@@ -3,8 +3,8 @@
  * @module core/lockFileDetector
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
 /**
  * Detects which lock files are present in a project
@@ -14,7 +14,7 @@ const path = require('path');
  * @property {boolean} yarn - Whether yarn.lock was found
  * @property {boolean} pnpm - Whether pnpm-lock.yaml was found
  */
-function detectLockFiles (projectRoot) {
+export function detectLockFiles(projectRoot) {
   const packageLock = path.join(projectRoot, 'package-lock.json');
   const yarnLock = path.join(projectRoot, 'yarn.lock');
   const pnpmLock = path.join(projectRoot, 'pnpm-lock.yaml');
@@ -31,7 +31,7 @@ function detectLockFiles (projectRoot) {
  * @param {string} projectRoot - The root directory of the project
  * @returns {string|null} The detected package manager (npm, yarn, pnpm) or null if none detected
  */
-function getPrimaryPackageManager (projectRoot) {
+export function getPrimaryPackageManager(projectRoot) {
   const lockFiles = detectLockFiles(projectRoot);
 
   // Priority: npm > yarn > pnpm
@@ -41,8 +41,3 @@ function getPrimaryPackageManager (projectRoot) {
 
   return null;
 }
-
-module.exports = {
-  detectLockFiles,
-  getPrimaryPackageManager
-};
