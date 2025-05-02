@@ -5,113 +5,182 @@
  * @module formatters/htmlFormatter
  */
 
-'use strict';
-
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import fsExtra from 'fs-extra';
 
 /**
  * Format analysis results as HTML
  * @param {Object} results - Analysis results
- * @param {Object} options - Formatting options
  * @returns {string} HTML report
  */
 function generateHtmlReport(results) {
+  // Ensure dependencies exist
+  const dependencies = results.dependencies || [];
+  
   const template = `
 <!DOCTYPE html>
 <html>
 <head>
   <title>DepDrift Analysis Report</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 2rem; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-    th { background-color: #f2f2f2; }
-    .high { color: red; }
-    .medium { color: orange; }
-    .low { color: green; }
+    body { font-family: Arial, sans-serif; margin: 2rem; line-height: 1.6; color: #333; }
+    h1 { color: #2c3e50; margin-bottom: 1rem; }
+    h2 { color: #3498db; margin-top: 2rem; margin-bottom: 1rem; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 2rem; }
+    th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background-color: #f2f2f2; font-weight: bold; }
+    tr:hover { background-color: #f5f5f5; }
+    .critical { color: #fff; background-color: #e74c3c; padding: 3px 7px; border-radius: 3px; }
+    .high { color: #fff; background-color: #e67e22; padding: 3px 7px; border-radius: 3px; }
+    .medium { color: #fff; background-color: #f39c12; padding: 3px 7px; border-radius: 3px; }
+    .low { color: #fff; background-color: #3498db; padding: 3px 7px; border-radius: 3px; }
+    .none { color: #fff; background-color: #2ecc71; padding: 3px 7px; border-radius: 3px; }
+    .summary-box { background-color: #f9f9f9; border: 1px solid #ddd; padding: 20px; border-radius: 5px; margin-bottom: 2rem; }
+    .footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #eee; color: #7f8c8d; font-size: 0.9rem; }
+    .stat { font-weight: bold; color: #2980b9; }
   </style>
 </head>
 <body>
   <h1>DepDrift Analysis Report</h1>
-  <h2>Package Analysis</h2>
+  
+  <div class="summary-box">
+    <h2>Project Summary</h2>
+    <p><strong>Project:</strong> ${results.projectName || 'Unknown'} ${results.projectVersion ? `v${results.projectVersion}` : ''}</p>
+    <p><strong>Dependencies Analyzed:</strong> <span class="stat">${dependencies.length}</span></p>
+    <p><strong>Up-to-date:</strong> <span class="stat">${dependencies.filter(dep => dep.driftLevel === 'none').length}</span> | <strong>Needs Update:</strong> <span class="stat">${dependencies.filter(dep => dep.driftLevel !== 'none').length}</span></p>
+    <p><strong>Vulnerable Dependencies:</strong> <span class="stat">${dependencies.filter(dep => dep.security && dep.security.vulnerable).length}</span></p>
+  </div>
+  
+  <h2>Dependency Analysis</h2>
   <table>
     <thead>
       <tr>
         <th>Package</th>
-        <th>Current Version</th>
-        <th>Expected Version</th>
-        <th>Drift Level</th>
-        <th>Security Issues</th>
+        <th>Current</th>
+        <th>Latest</th>
+        <th>Update Status</th>
+        <th>Last Published</th>
+        <th>Drift</th>
+        <th>Security</th>
       </tr>
     </thead>
     <tbody>
-      ${results.packages.map(pkg => `
+      ${dependencies.map(dep => `
         <tr>
-          <td>${pkg.name}</td>
-          <td>${pkg.currentVersion || 'N/A'}</td>
-          <td>${pkg.expectedVersion || 'N/A'}</td>
-          <td class="${getDriftClass(pkg.driftLevel)}">${pkg.driftLevel?.toFixed(2) || 'N/A'}</td>
-          <td class="${getSecurityClass(pkg.vulnerabilities?.length || 0)}">${pkg.vulnerabilities?.length || 0}</td>
+          <td>${dep.name}${dep.isDevDependency ? ' <small>(dev)</small>' : ''}</td>
+          <td class="version current">${dep.currentVersion || 'Unknown'}</td>
+          <td class="version latest">${dep.latestVersion || 'Unknown'}</td>
+          <td class="status ${dep.driftLevel === 'none' ? 'none' : dep.driftLevel === 'high' ? 'critical' : dep.driftLevel === 'medium' ? 'warning' : 'error'}">${dep.driftLevel === 'none' ? 
+              '<span class="none">Up to date</span>' : 
+              `<span class="${dep.driftLevel}">Needs update (${dep.daysBehind || 0} days behind)</span>`}
+          </td>
+          <td class="last-published ${dep.driftLevel === 'none' ? 'none' : dep.driftLevel === 'high' ? 'critical' : dep.driftLevel === 'medium' ? 'warning' : 'error'}">${new Date(dep.lastUpdated).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'Unknown'}</td>
+          <td class="drift-level ${dep.driftLevel}">${capitalizeDriftLevel(dep.driftLevel || 'none')}</td>
+          <td>${renderSecurityIssues(dep)}</td>
         </tr>
       `).join('')}
     </tbody>
   </table>
   
-  <h2>Summary</h2>
-  <p>Total Packages Analyzed: ${results.packages.length}</p>
-  <p>Average Drift Level: ${calculateAverageDrift(results.packages)}</p>
-  <p>Total Security Issues: ${calculateTotalSecurityIssues(results.packages)}</p>
+  ${renderRecommendations(results)}
   
-  <footer>
+  <div class="footer">
     <p>Generated by DepDrift on ${new Date().toLocaleString()}</p>
-  </footer>
+  </div>
 </body>
 </html>`;
 
   return template;
 }
 
-function getDriftClass(level) {
-  if (level >= 0.8) return 'high';
-  if (level >= 0.5) return 'medium';
-  return 'low';
-}
-
-function getSecurityClass(count) {
-  if (count > 0) return 'high';
-  return 'low';
-}
-
-function calculateAverageDrift(packages) {
-  const driftLevels = packages
-    .map(pkg => pkg.driftLevel)
-    .filter(level => typeof level === 'number');
+/**
+ * Render security issues
+ * @param {Object} dependency - Dependency object
+ * @returns {string} HTML for security issues
+ */
+function renderSecurityIssues(dependency) {
+  if (!dependency.security || !dependency.security.vulnerable) {
+    return '<span class="none">None</span>';
+  }
   
-  if (driftLevels.length === 0) return 'N/A';
+  const vulnerabilities = dependency.security.vulnerabilities || [];
+  const severityClass = dependency.security.highestSeverity || 'high';
+  const capitalizedSeverity = capitalizeDriftLevel(severityClass);
   
-  const average = driftLevels.reduce((sum, level) => sum + level, 0) / driftLevels.length;
-  return average.toFixed(2);
+  return `<span class="${severityClass}">${capitalizedSeverity}: ${vulnerabilities.length} ${vulnerabilities.length === 1 ? 'Issue' : 'Issues'}</span>`;
 }
 
-function calculateTotalSecurityIssues(packages) {
-  return packages.reduce((sum, pkg) => sum + (pkg.vulnerabilities?.length || 0), 0);
+/**
+ * Render recommendations section
+ * @param {Object} results - Analysis results
+ * @returns {string} HTML for recommendations
+ */
+function renderRecommendations(results) {
+  if (!results.recommendations || results.recommendations.length === 0) {
+    return '';
+  }
+  
+  return `
+  <h2>Recommendations</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Priority</th>
+        <th>Package</th>
+        <th>Current Version</th>
+        <th>Recommendation</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${results.recommendations.map((rec, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${rec.dependencyName}</td>
+          <td>${rec.currentVersion || 'N/A'}</td>
+          <td>${capitalizeFirstLetter(rec.recommendation)}</td>
+          <td>${capitalizeFirstLetter(rec.details)}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  `;
+}
+
+/**
+ * Capitalize the first letter of a string
+ * @param {string} text - Input text
+ * @returns {string} Text with first letter capitalized
+ */
+function capitalizeFirstLetter(text) {
+  if (!text) return '';
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /**
  * Save HTML report to file
- * @param {Object} results - Analysis results
+ * @param {string} html - HTML content
  * @param {string} filePath - Path to save the HTML report
  * @returns {Promise<void>}
  */
-async function saveHtmlReport(results, filePath) {
-  const fs = require('fs-extra');
-  const html = generateHtmlReport(results);
-  await fs.writeFile(filePath, html, 'utf8');
+async function saveHtmlReport(html, filePath) {
+  await fsExtra.ensureDir(path.dirname(filePath));
+  await fsExtra.writeFile(filePath, html, 'utf8');
+}
+
+/**
+ * Capitalize the first letter of drift level
+ * @param {string} level - Drift level
+ * @returns {string} Capitalized drift level
+ */
+function capitalizeDriftLevel(level) {
+  if (!level) return 'None';
+  return level.charAt(0).toUpperCase() + level.slice(1).toLowerCase();
 }
 
 // Export functions
-module.exports = {
+export {
   generateHtmlReport,
   saveHtmlReport
 };
