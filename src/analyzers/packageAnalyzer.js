@@ -144,7 +144,7 @@ function determineDriftLevelByDays (days) {
  * @property {string|null} latestVersion - Latest version from registry
  * @property {number} daysBehind - Days behind latest version (-1 if unknown)
  * @property {string} driftLevel - Calculated drift level ('none', 'low', 'medium', 'high', 'critical', 'unknown')
- * @property {string|null} lastUpdated - ISO date string of latest version publication
+ * @property {string|null} lastPublished - ISO date string of latest version publication
  * @property {string|undefined} error - Error message if analysis failed
  * @property {boolean} isDevDependency - Whether this is a dev dependency
  * @public
@@ -162,7 +162,7 @@ async function analyzeDependency (name, currentVersion, dev = false) {
       latestVersion: null,
       daysBehind: -1,
       driftLevel: 'unknown',
-      lastUpdated: null,
+      lastPublished: null,
       error: error.message,
       isDevDependency: dev
     };
@@ -177,7 +177,7 @@ async function analyzeDependency (name, currentVersion, dev = false) {
       latestVersion: null,
       daysBehind: -1,
       driftLevel: 'unknown',
-      lastUpdated: null,
+      lastPublished: null,
       error: 'No latest version found',
       isDevDependency: dev
     };
@@ -186,10 +186,10 @@ async function analyzeDependency (name, currentVersion, dev = false) {
   // If currentVersion has range indicators (^~), clean it
   const cleanCurrentVersion = semver.clean(currentVersion) || currentVersion.replace(/[^\d.]/g, '');
 
-  // Last updated date from the latest version
-  const lastUpdated = packageInfo.time?.[latestVersion];
+  // Last published date from the latest version
+  const lastPublished = packageInfo.time?.[latestVersion];
   const now = new Date();
-  const daysBehind = lastUpdated ? daysBetween(lastUpdated, now) : -1;
+  const daysBehind = lastPublished ? daysBetween(lastPublished, now) : -1;
 
   // Determine drift level
   const driftLevel = determineDriftLevel(daysBehind, cleanCurrentVersion, latestVersion);
@@ -200,7 +200,7 @@ async function analyzeDependency (name, currentVersion, dev = false) {
     latestVersion,
     daysBehind,
     driftLevel,
-    lastUpdated,
+    lastPublished,
     isDevDependency: dev
   };
 }
@@ -331,9 +331,9 @@ async function analyzePackage (packageInfo, options = {}) {
           dep.currentVersion.replace(/[^\d.]/g, '');
 
         // Get publication date of latest version
-        const lastUpdated = npmInfo.time?.[latestVersion];
+        const lastPublished = npmInfo.time?.[latestVersion];
         const now = new Date();
-        const daysBehind = lastUpdated ? daysBetween(lastUpdated, now) : -1;
+        const daysBehind = lastPublished ? daysBetween(lastPublished, now) : -1;
 
         // Calculate drift level
         const driftLevel = calculateDriftLevel(
@@ -348,7 +348,7 @@ async function analyzePackage (packageInfo, options = {}) {
           latestVersion,
           daysBehind,
           driftLevel,
-          lastUpdated
+          lastPublished
         };
       } catch (error) {
         return {
@@ -390,86 +390,6 @@ async function analyzePackage (packageInfo, options = {}) {
   }
 
   return result;
-}
-
-/**
- * Calculate the drift level based on version difference and days behind
- * @param {string} currentVersion - Current version
- * @param {string} latestVersion - Latest version
- * @param {number} daysBehind - Days behind latest version
- * @returns {string} Drift level ('none', 'low', 'medium', 'high', 'critical')
- * @public
- */
-function calculateDriftLevel (currentVersion, latestVersion, daysBehind) {
-  // If versions are the same, no drift
-  if (currentVersion === latestVersion) {
-    return 'none';
-  }
-
-  // Parse versions with semver
-  const current = semver.parse(currentVersion);
-  const latest = semver.parse(latestVersion);
-
-  if (!current || !latest) {
-    // If can't parse versions, use days as fallback
-    return calculateDriftLevelByDays(daysBehind);
-  }
-
-  let driftLevel = 'low';
-
-  // Major version difference
-  if (latest.major > current.major) {
-    const majorDiff = latest.major - current.major;
-    driftLevel = majorDiff >= 2 ? 'critical' : 'high';
-  }
-  // Minor version difference (same major)
-  else if (latest.minor > current.minor) {
-    const minorDiff = latest.minor - current.minor;
-    driftLevel = minorDiff >= 5 ? 'high' : 'medium';
-  }
-  // Patch version difference (same major and minor)
-  else if (latest.patch > current.patch) {
-    const patchDiff = latest.patch - current.patch;
-    driftLevel = patchDiff >= 10 ? 'medium' : 'low';
-  }
-
-  // Also consider days behind
-  const driftByDays = calculateDriftLevelByDays(daysBehind);
-
-  // Return the more severe of the two levels
-  const severityOrder = {
-    'none': 0,
-    'low': 1,
-    'medium': 2,
-    'high': 3,
-    'critical': 4
-  };
-
-  return severityOrder[driftByDays] > severityOrder[driftLevel]
-    ? driftByDays
-    : driftLevel;
-}
-
-/**
- * Calculate drift level based only on days behind
- * @param {number} days - Days behind latest version
- * @returns {string} Drift level ('none', 'low', 'medium', 'high', 'critical')
- * @public
- */
-function calculateDriftLevelByDays (days) {
-  if (days <= 0) {
-    return 'none';
-  }
-  if (days <= 30) {
-    return 'low';
-  }
-  if (days <= 90) {
-    return 'medium';
-  }
-  if (days <= 180) {
-    return 'high';
-  }
-  return 'critical';
 }
 
 /**
@@ -579,6 +499,21 @@ async function getPackageVersions(packageName) {
     console.warn(`Error fetching versions for ${packageName}:`, err);
     return [];
   }
+}
+
+/**
+ * Calculate the drift level based on version difference and days behind
+ * @param {string} currentVersion - Current version
+ * @param {string} latestVersion - Latest version
+ * @param {number} daysBehind - Days behind latest version
+ * @returns {string} Drift level ('none', 'low', 'medium', 'high', 'critical')
+ */
+export function calculateDriftLevel(currentVersion, latestVersion, daysBehind) {
+  if (currentVersion === latestVersion) return 'none';
+  if (daysBehind < 30) return 'low';
+  if (daysBehind < 90) return 'medium';
+  if (daysBehind < 180) return 'high';
+  return 'critical';
 }
 
 export {
