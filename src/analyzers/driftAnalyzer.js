@@ -5,7 +5,7 @@
  * and provides detailed reports on dependency inconsistencies in Node.js projects.
  */
 
-const semver = require('semver');
+import semver from 'semver';
 
 /**
  * Flattens an Arborist tree into a map of name@version -> node
@@ -402,7 +402,7 @@ function analyzeDrift (idealTree, actualTree, options = {}) {
   };
 }
 
-module.exports = {
+export {
   analyzeDrift,
   flattenTree,
   classifyVersionDifference
