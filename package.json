@@ -9,7 +9,8 @@
   },
   "scripts": {
     "start": "node bin/depdrift",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest --config=jest.config.mjs",
+    "test:cli": "NODE_OPTIONS=--experimental-vm-modules jest --config=jest.config.mjs test/unit/cli",
     "test:graphbuilder": "node test/run-graphbuilder-tests.js",
     "test:graphbuilder:unit": "node test/run-graphbuilder-tests.js --unit",
     "test:graphbuilder:integration": "node test/run-graphbuilder-tests.js --integration",

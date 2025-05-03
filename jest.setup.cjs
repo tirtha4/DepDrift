@@ -1,66 +1,33 @@
 /**
- * Jest setup file for the DepDrift project
+ * Jest setup file
  * 
- * This file is executed before each test file runs. It's used to set up
- * global configuration for all tests.
+ * This file runs before each test to set up the test environment.
  */
 
-// Set up the test environment
+// Set environment to test
 process.env.NODE_ENV = 'test';
 
-// Set a longer timeout for the tests
-jest.setTimeout(30000);
-
-// Silence console.log during tests to keep output clean
-// Comment this out if you need to debug with console.log
-global.console.log = jest.fn();
-
-// Enable debug logging only when needed
+// Enable debug only when needed
 global.DEBUG = false;
 
-// Add a global debug function
-global.debug = (msg, ...args) => {
-  console.log(`[DEBUG] ${msg}`, ...args);
+// Add a debug helper function
+global.debug = (message, ...args) => {
+  if (global.DEBUG) {
+    console.log(`[DEBUG] ${message}`, ...args);
+  }
 };
 
-// Reset all manual mocks before each test
-beforeEach(() => {
-  // Reset all mocks
-  jest.resetModules();
-  
-  // Reset our manual mocks if they exist
-  try {
-    const fs = require('fs');
-    if (fs.__resetMockData) fs.__resetMockData();
-  } catch (err) {
-    // Ignore if mock doesn't exist
-  }
-  
-  try {
-    const arborist = require('@npmcli/arborist');
-    if (arborist.__resetConfig) arborist.__resetConfig();
-  } catch (err) {
-    // Ignore if mock doesn't exist
-  }
-  
-  try {
-    const lockFileDetector = require('../src/core/lockFileDetector.js');
-    if (lockFileDetector.__resetMock) lockFileDetector.__resetMock();
-  } catch (err) {
-    // Ignore if mock doesn't exist
-  }
-});
+// Configure Jest if used in CommonJS context
+if (typeof jest !== 'undefined') {
+  // Configure the test timeout
+  jest.setTimeout(30000);
 
-// Silence console logs during tests
-beforeAll(() => {
+  // Silence console output during tests (comment out for debugging)
   jest.spyOn(console, 'log').mockImplementation(() => {});
-  jest.spyOn(console, 'debug').mockImplementation(() => {});
   jest.spyOn(console, 'info').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-});
+  // Keep errors visible: 
+  // jest.spyOn(console, 'error').mockImplementation(() => {});
+}
 
-// Restore console logs after tests
-afterAll(() => {
-  jest.restoreAllMocks();
-}); 
+module.exports = {}; 

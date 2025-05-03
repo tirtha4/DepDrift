@@ -278,6 +278,47 @@ async function reportDrift (records, options = {}) {
   });
 }
 
+/**
+ * Display recommendations in a formatted way
+ * @param {Array} recommendations - Array of recommendation objects
+ */
+function displayRecommendations(recommendations) {
+  if (!recommendations || recommendations.length === 0) {
+    console.log('No recommendations available.');
+    return;
+  }
+
+  console.log('\nRecommendations:');
+  for (const rec of recommendations) {
+    console.log(`  - ${rec.name}: Update from ${rec.currentVersion} to ${rec.recommendedVersion} (${rec.priority} priority)`);
+    if (rec.reason) {
+      console.log(`    Reason: ${rec.reason}`);
+    }
+  }
+}
+
+/**
+ * Display vulnerabilities in a formatted way
+ * @param {Array} vulnerabilities - Array of vulnerability objects
+ */
+function displayVulnerabilities(vulnerabilities) {
+  if (!vulnerabilities || vulnerabilities.length === 0) {
+    console.log('No vulnerabilities found.');
+    return;
+  }
+
+  console.log('\nVulnerabilities:');
+  for (const vuln of vulnerabilities) {
+    console.log(`  - ${vuln.name} (${vuln.version}): ${vuln.severity} severity`);
+    if (vuln.details) {
+      console.log(`    Details: ${vuln.details}`);
+    }
+    if (vuln.fixedIn) {
+      console.log(`    Fixed in: ${vuln.fixedIn}`);
+    }
+  }
+}
+
 // Import formatters from utils
 import { formatAnalysisJson, formatAnalysisText, formatAnalysisCSV } from '../utils/formatters.js';
 
@@ -287,6 +328,8 @@ export {
   generateSummary,
   saveReport,
   getStatusColor,
+  displayRecommendations,
+  displayVulnerabilities,
   // Legacy exports for backward compatibility
   reportDrift
 };

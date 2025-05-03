@@ -1,0 +1,77 @@
+{
+  "projectName": "test-project",
+  "projectPath": "/path/to/test-project",
+  "dependencies": [
+    {
+      "name": "test-dep-1",
+      "currentVersion": "1.0.0",
+      "latestVersion": "2.0.0",
+      "daysBehind": 100,
+      "driftLevel": "medium",
+      "isDevDependency": false
+    },
+    {
+      "name": "test-dep-2",
+      "currentVersion": "1.0.0",
+      "latestVersion": "3.0.0",
+      "daysBehind": 365,
+      "driftLevel": "critical",
+      "isDevDependency": false
+    },
+    {
+      "name": "dev-dep-1",
+      "currentVersion": "1.5.0",
+      "latestVersion": "1.5.2",
+      "daysBehind": 30,
+      "driftLevel": "low",
+      "isDevDependency": true
+    },
+    {
+      "name": "up-to-date-dep",
+      "currentVersion": "2.0.0",
+      "latestVersion": "2.0.0",
+      "daysBehind": 0,
+      "driftLevel": "none",
+      "isDevDependency": false
+    }
+  ],
+  "summary": {
+    "totalDependencies": 4,
+    "driftLevels": {
+      "none": 1,
+      "low": 1,
+      "medium": 1,
+      "high": 0,
+      "critical": 1
+    },
+    "averageDaysBehind": 123.75,
+    "majorVersionsBehind": 2,
+    "minorVersionsBehind": 1,
+    "patchVersionsBehind": 1
+  },
+  "vulnerabilities": [
+    {
+      "name": "test-dep-2",
+      "severity": "high",
+      "details": "Known security vulnerability CVE-2023-12345",
+      "version": "1.0.0",
+      "fixedIn": "1.0.1"
+    }
+  ],
+  "recommendations": [
+    {
+      "name": "test-dep-2",
+      "currentVersion": "1.0.0",
+      "recommendedVersion": "3.0.0",
+      "priority": "high",
+      "reason": "Critical drift and security vulnerability"
+    },
+    {
+      "name": "test-dep-1",
+      "currentVersion": "1.0.0",
+      "recommendedVersion": "2.0.0",
+      "priority": "medium",
+      "reason": "Medium drift level"
+    }
+  ]
+}

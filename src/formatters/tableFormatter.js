@@ -398,11 +398,11 @@ function createRecommendationsTable (recommendations) {
 
     // Convert from alternative format
     return {
-      dependencyName: rec.package || rec.name || 'Unknown package',
+      dependencyName: rec.dependencyName || rec.package || rec.name || 'Unknown package',
       currentVersion: rec.currentVersion || rec.version || 'unknown',
       recommendation: rec.recommendation ||
-                     (rec.targetVersion ? `Update to ${rec.targetVersion}` : 'Update recommended'),
-      details: rec.details ||
+                     (rec.recommendedVersion ? `Update to ${rec.recommendedVersion}` : 'Update recommended'),
+      details: rec.details || rec.reason ||
               (rec.reason ? `${rec.reason} (${rec.priority || 'medium'} priority)` :
                 'Dependency needs attention'),
       hasSecurity: rec.hasSecurity || rec.security || false
@@ -501,8 +501,8 @@ function formatAnalysisAsTables (analysis, options = {}) {
   const header = `
 ${chalk.bold.blue('DepDrift Analysis Results')}
 ${chalk.cyan('Project:')} ${chalk.white(analysis.projectName)}@${chalk.white(analysis.projectVersion)}
-${chalk.cyan('Path:')} ${chalk.white(analysis.packageJsonPath)}
-${chalk.cyan('Analyzed on:')} ${chalk.white(new Date(analysis.timestamp).toLocaleString())}
+${chalk.cyan('Path:')} ${chalk.white(analysis.packageJsonPath || analysis.projectPath)}
+${chalk.cyan('Analyzed on:')} ${chalk.white(analysis.timestamp ? new Date(analysis.timestamp).toLocaleString() : new Date().toLocaleString())}
 `;
 
   // Generate summary table
@@ -618,10 +618,23 @@ function getSecurityColor (severity) {
   }
 }
 
+/**
+ * Generate a table representation of the analysis results
+ * @param {Object} results - Analysis results
+ * @returns {Object} Table object that can be converted to a string
+ */
+function generateTable(results) {
+  const output = formatAnalysisAsTables(results);
+  return {
+    toString: () => output
+  };
+}
+
 export {
   formatAnalysisAsTables,
   createDependencyTable,
   createSummaryTable,
   createRecommendationsTable,
-  createExplanationBlock
+  createExplanationBlock,
+  generateTable
 };
