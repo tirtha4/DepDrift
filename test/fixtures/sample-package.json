@@ -1,0 +1,25 @@
+{
+  "name": "test-project",
+  "version": "1.0.0",
+  "description": "A test project for DepDrift",
+  "main": "index.js",
+  "dependencies": {
+    "express": "^4.17.1",
+    "lodash": "^4.17.21",
+    "react": "^17.0.2"
+  },
+  "devDependencies": {
+    "jest": "^27.0.0",
+    "eslint": "^7.32.0",
+    "typescript": "^4.4.3"
+  },
+  "peerDependencies": {
+    "react-dom": "^17.0.2"
+  },
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint ."
+  },
+  "author": "Test Author",
+  "license": "MIT"
+} 
