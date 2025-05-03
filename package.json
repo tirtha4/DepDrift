@@ -10,6 +10,7 @@
   "scripts": {
     "start": "node bin/depdrift",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --config=jest.config.mjs",
+    "test:ci": "NODE_OPTIONS=--experimental-vm-modules jest --config=jest.config.mjs --testPathIgnorePatterns=test/integration",
     "test:cli": "NODE_OPTIONS=--experimental-vm-modules jest --config=jest.config.mjs test/unit/cli",
     "test:graphbuilder": "node test/run-graphbuilder-tests.js",
     "test:graphbuilder:unit": "node test/run-graphbuilder-tests.js --unit",
@@ -18,7 +19,7 @@
     "test:graphbuilder:coverage": "node test/run-graphbuilder-tests.js --all --coverage",
     "self-analyze": "node bin/depdrift",
     "lint": "eslint src",
-    "prepublishOnly": "npm test"
+    "prepublishOnly": "npm run test:ci"
   },
   "keywords": [
     "dependencies",

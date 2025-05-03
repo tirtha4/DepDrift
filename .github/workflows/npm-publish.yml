@@ -17,7 +17,7 @@ jobs:
           node-version: 20
       - run: npm ci
       - name: Run tests excluding integration tests
-        run: NODE_OPTIONS=--experimental-vm-modules jest --config=jest.config.mjs --testPathIgnorePatterns=test/integration
+        run: npm run test:ci
 
   publish-npm:
     needs: build
